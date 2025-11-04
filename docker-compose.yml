@@ -58,8 +58,8 @@ services:
   # Frontend React App
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: sensor_frontend
     restart: unless-stopped
     environment:
