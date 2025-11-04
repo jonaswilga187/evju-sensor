@@ -1,5 +1,13 @@
-// API Base URL - aus Umgebungsvariablen oder Standard
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// API Base URL - MUSS in .env gesetzt sein!
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+// Debug: Zeige welche URL genutzt wird
+console.log('🔗 API URL:', API_BASE_URL);
+console.log('🌍 ENV Check:', import.meta.env);
+
+if (!API_BASE_URL) {
+  console.error('❌ VITE_API_URL ist nicht gesetzt! Bitte .env prüfen.');
+}
 
 /**
  * Sensor API Service

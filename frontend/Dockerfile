@@ -12,6 +12,10 @@ RUN npm install
 # Source-Code kopieren
 COPY . .
 
+# Build Argument für API URL
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 # Production Build erstellen
 RUN npm run build
 
