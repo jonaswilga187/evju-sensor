@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # MongoDB Datenbank
   mongodb:
-    image: mongo:7.0
+    image: mongo:4.4
     container_name: sensor_mongodb
     restart: unless-stopped
     environment:

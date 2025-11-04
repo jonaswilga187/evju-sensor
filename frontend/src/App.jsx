@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { sensorAPI } from './services/api'
 
-// Beispiel-Daten für Temperatur, Feuchtigkeit und Stromverbrauch
-const data = [
+// Fallback Beispiel-Daten (falls API nicht erreichbar)
+const fallbackData = [
   { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320 },
   { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280 },
   { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250 },
@@ -49,14 +50,79 @@ const CustomTooltip = ({ active, payload }) => {
 }
 
 function App() {
-  // Durchschnittswerte berechnen
-  const avgTemperatur = (data.reduce((sum, item) => sum + item.temperatur, 0) / data.length).toFixed(1)
-  const avgFeuchtigkeit = (data.reduce((sum, item) => sum + item.feuchtigkeit, 0) / data.length).toFixed(0)
+  // State für Daten
+  const [data, setData] = useState(fallbackData)
+  const [averages, setAverages] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Daten von API laden
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Parallel beide API-Aufrufe
+        const [chartData, avgData] = await Promise.all([
+          sensorAPI.get24HourData(),
+          sensorAPI.getAverages()
+        ])
+
+        // Zeitstempel formatieren für Charts
+        const formattedData = chartData.map(item => ({
+          zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          temperatur: item.temperatur,
+          feuchtigkeit: item.luftfeuchtigkeit,
+          stromverbrauch: item.stromverbrauch
+        }))
+
+        setData(formattedData)
+        setAverages(avgData)
+        
+      } catch (err) {
+        console.error('Fehler beim Laden der Daten:', err)
+        setError('Daten konnten nicht geladen werden. Verwende Beispieldaten.')
+        setData(fallbackData)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    // Initial laden
+    fetchData()
+
+    // Auto-Update alle 5 Minuten
+    const interval = setInterval(fetchData, 5 * 60 * 1000)
+
+    // Cleanup
+    return () => clearInterval(interval)
+  }, [])
+
+  // Durchschnittswerte aus API oder berechnet
+  const avgTemperatur = averages?.temperatur_avg?.toFixed(1) || 
+    (data.reduce((sum, item) => sum + item.temperatur, 0) / data.length).toFixed(1)
   
-  // kWh über 24h berechnen (Watt -> kWh)
-  // Annahme: Werte sind alle 2 Stunden, also 12 Messungen über 24h
-  const avgStromverbrauchWatt = data.reduce((sum, item) => sum + item.stromverbrauch, 0) / data.length
-  const kwhPer24h = ((avgStromverbrauchWatt * 24) / 1000).toFixed(2)
+  const avgFeuchtigkeit = averages?.luftfeuchtigkeit_avg?.toFixed(0) || 
+    (data.reduce((sum, item) => sum + item.feuchtigkeit, 0) / data.length).toFixed(0)
+  
+  const kwhPer24h = averages?.kwh_24h?.toFixed(2) || 
+    ((data.reduce((sum, item) => sum + item.stromverbrauch, 0) / data.length * 24) / 1000).toFixed(2)
+
+  // Loading State
+  if (loading && data.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Lade Sensordaten...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -64,12 +130,28 @@ function App() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              Umgebungs- & Energiemonitoring
-            </h1>
-            <p className="text-gray-600">
-              Echtzeit-Überwachung der Umgebungsbedingungen und des Stromverbrauchs
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                  Umgebungs- & Energiemonitoring
+                </h1>
+                <p className="text-gray-600">
+                  Echtzeit-Überwachung der Umgebungsbedingungen und des Stromverbrauchs
+                </p>
+              </div>
+              {/* Status Indikator */}
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${error ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
+                <span className="text-sm text-gray-600">
+                  {error ? 'Offline' : 'Live'}
+                </span>
+              </div>
+            </div>
+            {error && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">⚠️ {error}</p>
+              </div>
+            )}
           </div>
 
           {/* Stats Cards */}
@@ -84,7 +166,7 @@ function App() {
                     {avgTemperatur}°C
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Aktuell: {data[data.length - 1].temperatur}°C
+                    Aktuell: {data[data.length - 1]?.temperatur || 0}°C
                   </p>
                 </div>
                 <div className="w-16 h-16 bg-orange-400/20 rounded-full flex items-center justify-center">
@@ -105,7 +187,7 @@ function App() {
                     {avgFeuchtigkeit}%
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Aktuell: {data[data.length - 1].feuchtigkeit}%
+                    Aktuell: {data[data.length - 1]?.feuchtigkeit || 0}%
                   </p>
                 </div>
                 <div className="w-16 h-16 bg-blue-400/20 rounded-full flex items-center justify-center">
@@ -126,7 +208,7 @@ function App() {
                     {kwhPer24h} kWh
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Aktuell: {data[data.length - 1].stromverbrauch}W
+                    Aktuell: {data[data.length - 1]?.stromverbrauch || 0}W
                   </p>
                 </div>
                 <div className="w-16 h-16 bg-green-400/20 rounded-full flex items-center justify-center">
