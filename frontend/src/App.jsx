@@ -95,8 +95,8 @@ function App() {
     // Initial laden
     fetchData()
 
-    // Auto-Update alle 5 Minuten
-    const interval = setInterval(fetchData, 5 * 60 * 1000)
+    // Auto-Update alle 30 Sekunden (statt 5 Minuten)
+    const interval = setInterval(fetchData, 30 * 1000)
 
     // Cleanup
     return () => clearInterval(interval)
@@ -139,12 +139,24 @@ function App() {
                   Echtzeit-Überwachung der Umgebungsbedingungen und des Stromverbrauchs
                 </p>
               </div>
-              {/* Status Indikator */}
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${error ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
-                <span className="text-sm text-gray-600">
-                  {error ? 'Offline' : 'Live'}
-                </span>
+              {/* Status Indikator & Refresh Button */}
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                  title="Daten neu laden"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Aktualisieren
+                </button>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${error ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
+                  <span className="text-sm text-gray-600">
+                    {error ? 'Offline' : 'Live (30s)'}
+                  </span>
+                </div>
               </div>
             </div>
             {error && (
