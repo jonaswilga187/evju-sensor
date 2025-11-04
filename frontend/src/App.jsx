@@ -2,20 +2,23 @@ import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sensorAPI } from './services/api'
 
+// Strompreis für Berechnung
+const STROMPREIS = 0.30 // €/kWh
+
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
-  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320 },
-  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280 },
-  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250 },
-  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310 },
-  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450 },
-  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580 },
-  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720 },
-  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850 },
-  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780 },
-  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920 },
-  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650 },
-  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480 },
+  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, kosten: (320/1000)*STROMPREIS },
+  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, kosten: (280/1000)*STROMPREIS },
+  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, kosten: (250/1000)*STROMPREIS },
+  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, kosten: (310/1000)*STROMPREIS },
+  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, kosten: (450/1000)*STROMPREIS },
+  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, kosten: (580/1000)*STROMPREIS },
+  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, kosten: (720/1000)*STROMPREIS },
+  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, kosten: (850/1000)*STROMPREIS },
+  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, kosten: (780/1000)*STROMPREIS },
+  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, kosten: (920/1000)*STROMPREIS },
+  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, kosten: (650/1000)*STROMPREIS },
+  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, kosten: (480/1000)*STROMPREIS },
 ]
 
 // Custom Tooltip für moderne Darstellung
@@ -25,6 +28,7 @@ const CustomTooltip = ({ active, payload }) => {
       if (name === 'temperatur') return '°C'
       if (name === 'feuchtigkeit') return '%'
       if (name === 'stromverbrauch') return 'W'
+      if (name === 'kosten') return '€/h'
       return ''
     }
 
@@ -55,6 +59,9 @@ function App() {
   const [averages, setAverages] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Strompreis (€/kWh) - kann später in Settings verschoben werden
+  const strompreis = 0.30 // 30 Cent pro kWh
 
   // Daten von API laden
   useEffect(() => {
@@ -77,7 +84,8 @@ function App() {
           }),
           temperatur: item.temperatur,
           feuchtigkeit: item.luftfeuchtigkeit,
-          stromverbrauch: item.stromverbrauch
+          stromverbrauch: item.stromverbrauch,
+          kosten: parseFloat(((item.stromverbrauch / 1000) * strompreis).toFixed(3)) // €/Stunde
         }))
 
         setData(formattedData)
@@ -293,19 +301,23 @@ function App() {
           </div>
 
           {/* Stromverbrauch Chart */}
-          <div className="bg-gray-50 rounded-xl p-6">
+          <div className="bg-gray-50 rounded-xl p-6 mb-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-6">
               Stromverbrauch (24h)
             </h2>
             <ResponsiveContainer width="100%" height={350}>
               <AreaChart
                 data={data}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 60, left: 0, bottom: 0 }}
               >
                 <defs>
                   <linearGradient id="colorStromverbrauch" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorKosten" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -315,9 +327,17 @@ function App() {
                   style={{ fontSize: '14px' }}
                 />
                 <YAxis 
-                  stroke="#6b7280"
+                  yAxisId="left"
+                  stroke="#10b981"
                   style={{ fontSize: '14px' }}
-                  label={{ value: 'Watt', angle: -90, position: 'insideLeft', style: { fill: '#6b7280' } }}
+                  label={{ value: 'W', angle: 0, position: 'insideLeft', offset: 10, style: { fill: '#10b981', textAnchor: 'middle' } }}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#8b5cf6"
+                  style={{ fontSize: '14px' }}
+                  label={{ value: '€/h', angle: 0, position: 'insideRight', offset: 10, style: { fill: '#8b5cf6', textAnchor: 'middle' } }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
@@ -332,6 +352,17 @@ function App() {
                   fillOpacity={1}
                   fill="url(#colorStromverbrauch)"
                   name="stromverbrauch"
+                  yAxisId="left"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="kosten"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  fillOpacity={0.6}
+                  fill="url(#colorKosten)"
+                  name="kosten"
+                  yAxisId="right"
                 />
               </AreaChart>
             </ResponsiveContainer>
