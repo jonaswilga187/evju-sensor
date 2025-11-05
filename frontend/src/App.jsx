@@ -2,23 +2,23 @@ import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sensorAPI } from './services/api'
 
-// Strompreis für Berechnung
-const STROMPREIS = 0.30 // €/kWh
+// Spannung für Ampere-Berechnung (Deutschland: 230V)
+const SPANNUNG = 230 // Volt
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
-  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, kosten: (320/1000)*STROMPREIS },
-  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, kosten: (280/1000)*STROMPREIS },
-  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, kosten: (250/1000)*STROMPREIS },
-  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, kosten: (310/1000)*STROMPREIS },
-  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, kosten: (450/1000)*STROMPREIS },
-  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, kosten: (580/1000)*STROMPREIS },
-  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, kosten: (720/1000)*STROMPREIS },
-  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, kosten: (850/1000)*STROMPREIS },
-  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, kosten: (780/1000)*STROMPREIS },
-  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, kosten: (920/1000)*STROMPREIS },
-  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, kosten: (650/1000)*STROMPREIS },
-  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, kosten: (480/1000)*STROMPREIS },
+  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, ampere: 320/SPANNUNG },
+  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, ampere: 280/SPANNUNG },
+  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, ampere: 250/SPANNUNG },
+  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, ampere: 310/SPANNUNG },
+  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, ampere: 450/SPANNUNG },
+  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, ampere: 580/SPANNUNG },
+  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, ampere: 720/SPANNUNG },
+  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, ampere: 850/SPANNUNG },
+  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, ampere: 780/SPANNUNG },
+  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, ampere: 920/SPANNUNG },
+  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, ampere: 650/SPANNUNG },
+  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, ampere: 480/SPANNUNG },
 ]
 
 // Custom Tooltip für moderne Darstellung
@@ -28,7 +28,7 @@ const CustomTooltip = ({ active, payload }) => {
       if (name === 'temperatur') return '°C'
       if (name === 'feuchtigkeit') return '%'
       if (name === 'stromverbrauch') return 'W'
-      if (name === 'kosten') return '€/h'
+      if (name === 'ampere') return 'A'
       return ''
     }
 
@@ -60,9 +60,6 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Strompreis (€/kWh) - kann später in Settings verschoben werden
-  const strompreis = 0.30 // 30 Cent pro kWh
-
   // Daten von API laden
   useEffect(() => {
     const fetchData = async () => {
@@ -85,7 +82,7 @@ function App() {
           temperatur: item.temperatur,
           feuchtigkeit: item.luftfeuchtigkeit,
           stromverbrauch: item.stromverbrauch,
-          kosten: parseFloat(((item.stromverbrauch / 1000) * strompreis).toFixed(3)) // €/Stunde
+          ampere: parseFloat((item.stromverbrauch / SPANNUNG).toFixed(2)) // Watt / 230V = Ampere
         }))
 
         setData(formattedData)
@@ -176,7 +173,7 @@ function App() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6 border border-orange-200">
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">
@@ -189,8 +186,8 @@ function App() {
                     Aktuell: {data[data.length - 1]?.temperatur || 0}°C
                   </p>
                 </div>
-                <div className="w-16 h-16 bg-orange-400/20 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-red-400/20 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
@@ -246,10 +243,20 @@ function App() {
               Temperatur & Luftfeuchtigkeit (24h)
             </h2>
             <ResponsiveContainer width="100%" height={350}>
-              <LineChart
+              <AreaChart
                 data={data}
                 margin={{ top: 10, right: 60, left: 0, bottom: 0 }}
               >
+                <defs>
+                  <linearGradient id="colorTemperatur" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorFeuchtigkeit" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="zeit" 
@@ -258,10 +265,11 @@ function App() {
                 />
                 <YAxis 
                   yAxisId="left"
-                  stroke="#f97316"
+                  stroke="#ef4444"
                   style={{ fontSize: '14px' }}
-                  label={{ value: '°C', angle: 0, position: 'insideLeft', offset: 10, style: { fill: '#f97316', textAnchor: 'middle' } }}
-                  domain={[-5, 35]}
+                  label={{ value: '°C', angle: 0, position: 'insideLeft', offset: 10, style: { fill: '#ef4444', textAnchor: 'middle' } }}
+                  domain={[-5, 30]}
+                  ticks={[-5, 0, 5, 10, 15, 20, 25, 30]}
                 />
                 <YAxis 
                   yAxisId="right"
@@ -269,34 +277,35 @@ function App() {
                   stroke="#3b82f6"
                   style={{ fontSize: '14px' }}
                   label={{ value: '%', angle: 0, position: 'insideRight', offset: 10, style: { fill: '#3b82f6', textAnchor: 'middle' } }}
-                  domain={[0, 100]}
+                  domain={[0, 150]}
+                  ticks={[0, 25, 50, 75, 100, 125, 150]}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{ paddingTop: '20px' }}
                   formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="temperatur"
-                  stroke="#f97316"
+                  stroke="#ef4444"
                   strokeWidth={3}
-                  dot={{ fill: '#f97316', r: 4 }}
-                  activeDot={{ r: 6 }}
+                  fillOpacity={1}
+                  fill="url(#colorTemperatur)"
                   name="temperatur"
                   yAxisId="left"
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="feuchtigkeit"
                   stroke="#3b82f6"
                   strokeWidth={3}
-                  dot={{ fill: '#3b82f6', r: 4 }}
-                  activeDot={{ r: 6 }}
+                  fillOpacity={1}
+                  fill="url(#colorFeuchtigkeit)"
                   name="feuchtigkeit"
                   yAxisId="right"
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 
@@ -315,7 +324,7 @@ function App() {
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
                   </linearGradient>
-                  <linearGradient id="colorKosten" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorAmpere" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
                   </linearGradient>
@@ -331,13 +340,15 @@ function App() {
                   stroke="#10b981"
                   style={{ fontSize: '14px' }}
                   label={{ value: 'W', angle: 0, position: 'insideLeft', offset: 10, style: { fill: '#10b981', textAnchor: 'middle' } }}
+                  domain={[0, 1000]}
                 />
                 <YAxis 
                   yAxisId="right"
                   orientation="right"
                   stroke="#8b5cf6"
                   style={{ fontSize: '14px' }}
-                  label={{ value: '€/h', angle: 0, position: 'insideRight', offset: 10, style: { fill: '#8b5cf6', textAnchor: 'middle' } }}
+                  label={{ value: 'A', angle: 0, position: 'insideRight', offset: 10, style: { fill: '#8b5cf6', textAnchor: 'middle' } }}
+                  domain={[0, 16]}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
@@ -356,12 +367,12 @@ function App() {
                 />
                 <Area
                   type="monotone"
-                  dataKey="kosten"
+                  dataKey="ampere"
                   stroke="#8b5cf6"
                   strokeWidth={2}
                   fillOpacity={0.6}
-                  fill="url(#colorKosten)"
-                  name="kosten"
+                  fill="url(#colorAmpere)"
+                  name="ampere"
                   yAxisId="right"
                 />
               </AreaChart>
