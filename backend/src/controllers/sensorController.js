@@ -119,19 +119,26 @@ export const createMesswert = async (req, res, next) => {
   try {
     const { temperatur, luftfeuchtigkeit, stromverbrauch, zeitstempel } = req.body;
 
-    if (temperatur === undefined || luftfeuchtigkeit === undefined || stromverbrauch === undefined) {
+    // Temperatur und Luftfeuchtigkeit sind Pflicht, Stromverbrauch ist optional
+    if (temperatur === undefined || luftfeuchtigkeit === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Temperatur, Luftfeuchtigkeit und Stromverbrauch sind erforderlich'
+        message: 'Temperatur und Luftfeuchtigkeit sind erforderlich'
       });
     }
 
-    const data = await sensorService.createMesswert({
+    const messwertData = {
       temperatur,
       luftfeuchtigkeit,
-      stromverbrauch,
       zeitstempel: zeitstempel ? new Date(zeitstempel) : new Date()
-    });
+    };
+
+    // Stromverbrauch nur hinzufügen, wenn vorhanden
+    if (stromverbrauch !== undefined) {
+      messwertData.stromverbrauch = stromverbrauch;
+    }
+
+    const data = await sensorService.createMesswert(messwertData);
 
     res.status(201).json({
       success: true,
@@ -176,6 +183,37 @@ export const getStats = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/sensors/power - Stromverbrauch separat hinzufügen/aktualisieren
+export const addPowerConsumption = async (req, res, next) => {
+  try {
+    const { stromverbrauch, zeitstempel, sensor_id } = req.body;
+
+    if (stromverbrauch === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stromverbrauch ist erforderlich'
+      });
+    }
+
+    // Versuche, den aktuellsten Messwert zu aktualisieren oder einen neuen zu erstellen
+    const result = await sensorService.updateOrCreatePowerMeasurement({
+      stromverbrauch,
+      zeitstempel: zeitstempel ? new Date(zeitstempel) : new Date(),
+      sensor_id: sensor_id || 'sensor_001'
+    });
+
+    res.status(result.created ? 201 : 200).json({
+      success: true,
+      message: result.created 
+        ? 'Stromverbrauch-Messwert erstellt' 
+        : 'Stromverbrauch aktualisiert',
+      data: result.data
     });
   } catch (error) {
     next(error);

@@ -210,8 +210,21 @@ Content-Type: application/json
 {
   "temperatur": 22.5,
   "luftfeuchtigkeit": 65,
-  "stromverbrauch": 450,
+  "stromverbrauch": 450,  // NEU: Optional!
   "zeitstempel": "2025-11-04T14:30:00Z"  // optional
+}
+```
+
+**Wichtig:** Ab sofort ist `stromverbrauch` **optional**! Du kannst auch nur Klima-Daten senden:
+
+```http
+POST /api/sensors
+Content-Type: application/json
+
+{
+  "temperatur": 22.5,
+  "luftfeuchtigkeit": 65
+  // stromverbrauch weggelassen
 }
 ```
 
@@ -247,6 +260,43 @@ Content-Type: application/json
 }
 ```
 
+#### 9. Stromverbrauch separat senden (NEU!)
+```http
+POST /api/sensors/power
+Content-Type: application/json
+
+{
+  "stromverbrauch": 450,
+  "zeitstempel": "2025-11-04T14:30:00Z",  // optional
+  "sensor_id": "power_sensor_001"         // optional
+}
+```
+
+**Use Case:** Perfekt, wenn der Stromverbrauch von einem separaten Gerät/Sensor kommt!
+
+**Verhalten:**
+- Sucht nach einem passenden Messwert im **5-Minuten-Zeitfenster**
+- Wenn gefunden: Aktualisiert den Stromverbrauch
+- Wenn nicht gefunden: Erstellt einen neuen Messwert (nur mit Stromverbrauch)
+
+**Response (Update):**
+```json
+{
+  "success": true,
+  "message": "Stromverbrauch aktualisiert",
+  "data": { ... }
+}
+```
+
+**Response (Neu erstellt):**
+```json
+{
+  "success": true,
+  "message": "Stromverbrauch-Messwert erstellt",
+  "data": { ... }
+}
+```
+
 ### Health Check
 ```http
 GET /health
@@ -256,10 +306,10 @@ GET /health
 
 ```javascript
 {
-  zeitstempel: Date,        // Messzeitpunkt
-  temperatur: Number,       // -50 bis 100°C
-  luftfeuchtigkeit: Number, // 0 bis 100%
-  stromverbrauch: Number,   // in Watt
+  zeitstempel: Date,        // Messzeitpunkt (erforderlich)
+  temperatur: Number,       // -50 bis 100°C (optional)
+  luftfeuchtigkeit: Number, // 0 bis 100% (optional)
+  stromverbrauch: Number,   // in Watt (optional)
   meta: {
     standort: String,       // z.B. "Wohnzimmer"
     sensor_id: String       // z.B. "sensor_001"
@@ -268,6 +318,9 @@ GET /health
   updatedAt: Date           // Automatisch
 }
 ```
+
+**Wichtig:** Alle Messwerte (temperatur, luftfeuchtigkeit, stromverbrauch) sind jetzt **optional**!
+Das ermöglicht flexible Sensor-Setups (z.B. nur Klima oder nur Stromverbrauch).
 
 ### Indices
 - `zeitstempel` (absteigend)
@@ -294,10 +347,20 @@ curl http://localhost:5000/api/sensors/24h
 # Averages
 curl http://localhost:5000/api/sensors/averages
 
-# Create Messwert
+# Create Messwert (alle Werte)
 curl -X POST http://localhost:5000/api/sensors \
   -H "Content-Type: application/json" \
   -d '{"temperatur":22.5,"luftfeuchtigkeit":65,"stromverbrauch":450}'
+
+# Create Messwert (nur Klima, ohne Stromverbrauch)
+curl -X POST http://localhost:5000/api/sensors \
+  -H "Content-Type: application/json" \
+  -d '{"temperatur":22.5,"luftfeuchtigkeit":65}'
+
+# Stromverbrauch separat senden (NEU!)
+curl -X POST http://localhost:5000/api/sensors/power \
+  -H "Content-Type: application/json" \
+  -d '{"stromverbrauch":450,"sensor_id":"power_sensor_001"}'
 ```
 
 ## 📝 Frontend Integration
@@ -325,7 +388,11 @@ export const sensorAPI = {
   getLast24Hours: () => axios.get(`${API_BASE_URL}/sensors/24h`),
   getAverages: () => axios.get(`${API_BASE_URL}/sensors/averages`),
   getLatest: () => axios.get(`${API_BASE_URL}/sensors/latest`),
-  createMesswert: (data) => axios.post(`${API_BASE_URL}/sensors`, data)
+  createMesswert: (data) => axios.post(`${API_BASE_URL}/sensors`, data),
+  
+  // NEU: Stromverbrauch separat senden
+  sendPowerConsumption: (stromverbrauch, sensor_id) => 
+    axios.post(`${API_BASE_URL}/sensors/power`, { stromverbrauch, sensor_id })
 };
 ```
 

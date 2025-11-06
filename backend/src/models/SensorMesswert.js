@@ -8,20 +8,23 @@ const messwertSchema = new mongoose.Schema({
   },
   temperatur: {
     type: Number,
-    required: [true, 'Temperatur ist erforderlich'],
+    required: false, // Optional für separate Stromverbrauch-Messwerte
     min: [-50, 'Temperatur muss mindestens -50°C sein'],
-    max: [100, 'Temperatur darf maximal 100°C sein']
+    max: [100, 'Temperatur darf maximal 100°C sein'],
+    default: null
   },
   luftfeuchtigkeit: {
     type: Number,
-    required: [true, 'Luftfeuchtigkeit ist erforderlich'],
+    required: false, // Optional für separate Stromverbrauch-Messwerte
     min: [0, 'Luftfeuchtigkeit muss mindestens 0% sein'],
-    max: [100, 'Luftfeuchtigkeit darf maximal 100% sein']
+    max: [100, 'Luftfeuchtigkeit darf maximal 100% sein'],
+    default: null
   },
   stromverbrauch: {
     type: Number,
-    required: [true, 'Stromverbrauch ist erforderlich'],
-    min: [0, 'Stromverbrauch muss positiv sein']
+    required: false, // Optional - kann separat gesendet werden
+    min: [0, 'Stromverbrauch muss positiv sein'],
+    default: null
   },
   meta: {
     standort: {

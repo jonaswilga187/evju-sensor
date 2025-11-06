@@ -14,6 +14,7 @@ router.get('/stats', sensorController.getStats);
 // POST Routes
 router.post('/', sensorController.createMesswert);
 router.post('/bulk', sensorController.createBulkMesswerte);
+router.post('/power', sensorController.addPowerConsumption);
 
 export default router;
 
