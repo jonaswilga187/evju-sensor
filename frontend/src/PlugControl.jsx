@@ -226,55 +226,58 @@ function PlugControl() {
 
           {/* Temperatur-Einstellung (nur bei Auto) */}
           {plugStatus?.mode === 'auto' && (
-            <div className="flex-1 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Temperaturschwellenwert
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="5"
-                    max="30"
-                    step="0.5"
-                    value={temperatureInput}
-                    onChange={(e) => setTemperatureInput(parseFloat(e.target.value))}
-                    onBlur={updateSettings}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-600">°C</span>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Automatik-Einstellungen
+              </label>
+              <div className="flex items-start gap-3">
+                {/* Temperaturschwellenwert */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <input
+                      type="number"
+                      min="5"
+                      max="30"
+                      step="0.5"
+                      value={temperatureInput}
+                      onChange={(e) => setTemperatureInput(parseFloat(e.target.value))}
+                      onBlur={updateSettings}
+                      className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <span className="text-xs text-gray-600">°C Schwelle</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    EIN bei &lt; {temperatureInput}°C
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Heizung EIN bei &lt; {temperatureInput}°C
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Hysterese (Puffer)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.1"
-                    value={hysteresisInput}
-                    onChange={(e) => setHysteresisInput(parseFloat(e.target.value))}
-                    onBlur={updateSettings}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-600">°C</span>
-                  <button
-                    onClick={updateSettings}
-                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                  >
-                    ✓
-                  </button>
+                
+                {/* Hysterese */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      step="0.1"
+                      value={hysteresisInput}
+                      onChange={(e) => setHysteresisInput(parseFloat(e.target.value))}
+                      onBlur={updateSettings}
+                      className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <span className="text-xs text-gray-600">°C Puffer</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    AUS bei ≥ {(temperatureInput + hysteresisInput).toFixed(1)}°C
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Heizung AUS bei ≥ {(temperatureInput + hysteresisInput).toFixed(1)}°C
-                </p>
+                
+                {/* Update Button */}
+                <button
+                  onClick={updateSettings}
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm self-start"
+                >
+                  ✓
+                </button>
               </div>
             </div>
           )}
