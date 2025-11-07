@@ -182,5 +182,54 @@ export const sensorAPI = {
   },
 };
 
+/**
+ * Plug Control API Service
+ * API-Aufrufe für die Steckdosen-Steuerung
+ */
+export const plugAPI = {
+  /**
+   * Kompletten Status abrufen (für Website)
+   * @returns {Promise<Object>} Status-Objekt mit desired_state, reported_state, timestamps
+   */
+  async getStatus() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/plug/status`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen des Plug-Status:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gewünschten Status setzen (Steckdose ein/aus)
+   * @param {string} state - "on" oder "off"
+   * @returns {Promise<Object>} Aktualisierter Status
+   */
+  async setDesiredState(state) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/plug/desired`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Setzen des Plug-Status:', error);
+      throw error;
+    }
+  },
+};
+
 export default sensorAPI;
 

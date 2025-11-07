@@ -1,0 +1,359 @@
+{
+  "info": {
+    "name": "🔥 Heizung Control API",
+    "_postman_id": "heizung-control-api",
+    "description": "Einfache Collection nur für Heizungssteuerung - Zum schnellen Testen",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Lokale Entwicklung"
+    },
+    {
+      "key": "prod_url",
+      "value": "https://api.temperatur.evjucelle.de",
+      "type": "string",
+      "description": "Produktions-URL"
+    }
+  ],
+  "item": [
+    {
+      "name": "🌐 Website Aktionen",
+      "description": "Endpunkte die von der Website aufgerufen werden",
+      "item": [
+        {
+          "name": "Status abrufen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/plug/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "status"]
+            },
+            "description": "Holt den kompletten Status:\n- desired_state: Was die Website eingestellt hat\n- reported_state: Was der ESP32 gemeldet hat\n- last_fetched: Wann ESP32 zuletzt abgefragt hat\n- last_changed: Wann Website zuletzt geändert hat"
+          },
+          "response": [
+            {
+              "name": "Erfolgreiche Antwort",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/plug/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "status"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"shelly_plug_main\",\n    \"desired_state\": \"on\",\n    \"reported_state\": \"on\",\n    \"last_fetched\": \"2024-11-06T10:30:00.000Z\",\n    \"last_changed\": \"2024-11-06T10:29:45.000Z\",\n    \"last_reported\": \"2024-11-06T10:30:05.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Heizung EINSCHALTEN",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"on\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/desired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "desired"]
+            },
+            "description": "Setzt den gewünschten Status auf 'on'\nESP32 wird beim nächsten Abruf (alle 5 Sek.) die Heizung einschalten"
+          },
+          "response": [
+            {
+              "name": "Erfolg",
+              "originalRequest": {
+                "method": "PUT",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"state\": \"on\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/plug/desired",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "desired"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"message\": \"Heizung auf \\\"on\\\" gesetzt\",\n  \"data\": {\n    \"desired_state\": \"on\",\n    \"last_changed\": \"2024-11-06T10:30:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Heizung AUSSCHALTEN",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"off\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/desired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "desired"]
+            },
+            "description": "Setzt den gewünschten Status auf 'off'\nESP32 wird beim nächsten Abruf (alle 5 Sek.) die Heizung ausschalten"
+          },
+          "response": [
+            {
+              "name": "Erfolg",
+              "originalRequest": {
+                "method": "PUT",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"state\": \"off\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/plug/desired",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "desired"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"message\": \"Heizung auf \\\"off\\\" gesetzt\",\n  \"data\": {\n    \"desired_state\": \"off\",\n    \"last_changed\": \"2024-11-06T10:30:00.000Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🤖 ESP32 Aktionen",
+      "description": "Endpunkte die vom ESP32 aufgerufen werden",
+      "item": [
+        {
+          "name": "Gewünschten Status abrufen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/plug/desired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "desired"]
+            },
+            "description": "ESP32 fragt alle 5 Sekunden: 'Was soll ich tun?'\nBekommt zurück: on oder off"
+          },
+          "response": [
+            {
+              "name": "Antwort",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/plug/desired",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "desired"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"desired_state\": \"on\",\n    \"last_changed\": \"2024-11-06T10:30:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Status melden - ON",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"on\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/reported",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "reported"]
+            },
+            "description": "ESP32 meldet: 'Ich habe die Heizung eingeschaltet'\nAktualisiert reported_state auf 'on'"
+          },
+          "response": [
+            {
+              "name": "Erfolg",
+              "originalRequest": {
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"state\": \"on\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/plug/reported",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "reported"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"success\": true,\n  \"message\": \"Status aktualisiert\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Status melden - OFF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"off\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/reported",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "reported"]
+            },
+            "description": "ESP32 meldet: 'Ich habe die Heizung ausgeschaltet'\nAktualisiert reported_state auf 'off'"
+          }
+        },
+        {
+          "name": "Status melden - UNKNOWN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"unknown\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/reported",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "reported"]
+            },
+            "description": "ESP32 meldet: 'Status unbekannt' (z.B. bei Fehler)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Test Szenarien",
+      "description": "Komplette Workflows zum Testen",
+      "item": [
+        {
+          "name": "Test Flow: Heizung einschalten",
+          "item": [
+            {
+              "name": "1. Status vor Änderung prüfen",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/plug/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "status"]
+                }
+              }
+            },
+            {
+              "name": "2. Heizung einschalten",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"state\": \"on\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/plug/desired",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "desired"]
+                }
+              }
+            },
+            {
+              "name": "3. ESP32 fragt Status ab",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/plug/desired",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "desired"]
+                }
+              }
+            },
+            {
+              "name": "4. ESP32 meldet Erfolg",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"state\": \"on\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/plug/reported",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "reported"]
+                }
+              }
+            },
+            {
+              "name": "5. Status nach Änderung prüfen",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/plug/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "plug", "status"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+

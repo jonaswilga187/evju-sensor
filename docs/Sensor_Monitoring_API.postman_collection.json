@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Sensor Monitoring API",
+    "name": "Sensor Monitoring & Heizung Control API",
     "_postman_id": "sensor-monitoring-api",
-    "description": "API für Temperatur, Luftfeuchtigkeit und Stromverbrauch Monitoring",
+    "description": "API für Temperatur, Luftfeuchtigkeit, Stromverbrauch Monitoring und Heizungssteuerung",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -14,7 +14,10 @@
   ],
   "item": [
     {
-      "name": "Health Check",
+      "name": "🏥 System",
+      "item": [
+        {
+          "name": "Health Check",
       "request": {
         "method": "GET",
         "header": [],
@@ -25,147 +28,273 @@
         }
       }
     },
-    {
-      "name": "API Info",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api",
-          "host": ["{{base_url}}"],
-          "path": ["api"]
-        }
-      }
-    },
-    {
-      "name": "Get Latest",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/sensors/latest",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "latest"]
-        }
-      }
-    },
-    {
-      "name": "Get 24h Data",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/sensors/24h",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "24h"]
-        }
-      }
-    },
-    {
-      "name": "Get Averages",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/sensors/averages",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "averages"]
-        }
-      }
-    },
-    {
-      "name": "Get Hourly Data",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/sensors/hourly?hours=24",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "hourly"],
-          "query": [
-            {
-              "key": "hours",
-              "value": "24"
+        {
+          "name": "API Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api",
+              "host": ["{{base_url}}"],
+              "path": ["api"]
             }
-          ]
+          }
         }
-      }
+      ]
     },
     {
-      "name": "Get Data by Range",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/sensors/range?start=2025-11-04T00:00:00Z&end=2025-11-04T23:59:59Z",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "range"],
-          "query": [
-            {
-              "key": "start",
-              "value": "2025-11-04T00:00:00Z"
+      "name": "📊 Sensoren",
+      "item": [
+        {
+          "name": "Get Latest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sensors/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "latest"]
+            }
+          }
+        },
+        {
+          "name": "Get 24h Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sensors/24h",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "24h"]
+            }
+          }
+        },
+        {
+          "name": "Get Averages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sensors/averages",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "averages"]
+            }
+          }
+        },
+        {
+          "name": "Get Hourly Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sensors/hourly?hours=24",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "hourly"],
+              "query": [
+                {
+                  "key": "hours",
+                  "value": "24"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Data by Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sensors/range?start=2025-11-04T00:00:00Z&end=2025-11-04T23:59:59Z",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "range"],
+              "query": [
+                {
+                  "key": "start",
+                  "value": "2025-11-04T00:00:00Z"
+                },
+                {
+                  "key": "end",
+                  "value": "2025-11-04T23:59:59Z"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sensors/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Create Messwert",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"temperatur\": 23.5,\n  \"luftfeuchtigkeit\": 58,\n  \"stromverbrauch\": 600\n}"
             },
-            {
-              "key": "end",
-              "value": "2025-11-04T23:59:59Z"
+            "url": {
+              "raw": "{{base_url}}/api/sensors",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors"]
             }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Get Stats",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/sensors/stats",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "stats"]
-        }
-      }
-    },
-    {
-      "name": "Create Messwert",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
           }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"temperatur\": 23.5,\n  \"luftfeuchtigkeit\": 58,\n  \"stromverbrauch\": 600\n}"
         },
-        "url": {
-          "raw": "{{base_url}}/api/sensors",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors"]
+        {
+          "name": "Create Bulk Messwerte",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messwerte\": [\n    {\n      \"zeitstempel\": \"2025-11-04T20:00:00Z\",\n      \"temperatur\": 22.0,\n      \"luftfeuchtigkeit\": 60,\n      \"stromverbrauch\": 400\n    },\n    {\n      \"zeitstempel\": \"2025-11-04T21:00:00Z\",\n      \"temperatur\": 22.5,\n      \"luftfeuchtigkeit\": 62,\n      \"stromverbrauch\": 420\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sensors/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sensors", "bulk"]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "Create Bulk Messwerte",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+      "name": "🔥 Heizung Control",
+      "item": [
+        {
+          "name": "Get Status (Website)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/plug/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "status"]
+            },
+            "description": "Holt den kompletten Status der Heizung (Soll- und Ist-Status, Timestamps)"
           }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"messwerte\": [\n    {\n      \"zeitstempel\": \"2025-11-04T20:00:00Z\",\n      \"temperatur\": 22.0,\n      \"luftfeuchtigkeit\": 60,\n      \"stromverbrauch\": 400\n    },\n    {\n      \"zeitstempel\": \"2025-11-04T21:00:00Z\",\n      \"temperatur\": 22.5,\n      \"luftfeuchtigkeit\": 62,\n      \"stromverbrauch\": 420\n    }\n  ]\n}"
         },
-        "url": {
-          "raw": "{{base_url}}/api/sensors/bulk",
-          "host": ["{{base_url}}"],
-          "path": ["api", "sensors", "bulk"]
+        {
+          "name": "Get Desired State (ESP32)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/plug/desired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "desired"]
+            },
+            "description": "ESP32 fragt: Was soll ich tun? (on/off)"
+          }
+        },
+        {
+          "name": "Set Desired State - ON",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"on\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/desired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "desired"]
+            },
+            "description": "Heizung einschalten (Website)"
+          }
+        },
+        {
+          "name": "Set Desired State - OFF",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"off\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/desired",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "desired"]
+            },
+            "description": "Heizung ausschalten (Website)"
+          }
+        },
+        {
+          "name": "Report State - ON (ESP32)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"on\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/reported",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "reported"]
+            },
+            "description": "ESP32 meldet: Heizung ist jetzt AN"
+          }
+        },
+        {
+          "name": "Report State - OFF (ESP32)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"state\": \"off\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/reported",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "reported"]
+            },
+            "description": "ESP32 meldet: Heizung ist jetzt AUS"
+          }
         }
-      }
+      ]
     }
   ]
 }

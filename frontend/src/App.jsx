@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sensorAPI } from './services/api'
+import PlugControl from './PlugControl'
 
 // Spannung für Ampere-Berechnung (Deutschland: 230V)
 const SPANNUNG = 230 // Volt
@@ -377,6 +378,11 @@ function App() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Heizung Steuerung */}
+          <div className="mb-8">
+            <PlugControl />
           </div>
         </div>
       </div>

@@ -59,47 +59,4 @@ export const getStats = async () => {
   };
 };
 
-// Stromverbrauch separat hinzufügen oder aktualisieren
-export const updateOrCreatePowerMeasurement = async ({ stromverbrauch, zeitstempel, sensor_id }) => {
-  // Zeitfenster: 5 Minuten vor und nach dem Zeitstempel
-  const timeWindow = 5 * 60 * 1000; // 5 Minuten in Millisekunden
-  const startTime = new Date(zeitstempel.getTime() - timeWindow);
-  const endTime = new Date(zeitstempel.getTime() + timeWindow);
-
-  // Suche nach einem passenden Messwert im Zeitfenster
-  const existingMesswert = await SensorMesswert.findOne({
-    zeitstempel: {
-      $gte: startTime,
-      $lte: endTime
-    },
-    'meta.sensor_id': sensor_id
-  }).sort({ zeitstempel: -1 });
-
-  if (existingMesswert) {
-    // Aktualisiere bestehenden Messwert
-    existingMesswert.stromverbrauch = stromverbrauch;
-    const updated = await existingMesswert.save();
-    return {
-      created: false,
-      data: updated
-    };
-  } else {
-    // Erstelle neuen Messwert nur mit Stromverbrauch
-    const newMesswert = new SensorMesswert({
-      zeitstempel,
-      stromverbrauch,
-      temperatur: null,
-      luftfeuchtigkeit: null,
-      meta: {
-        sensor_id
-      }
-    });
-    const saved = await newMesswert.save();
-    return {
-      created: true,
-      data: saved
-    };
-  }
-};
-
 

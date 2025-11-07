@@ -1,5 +1,6 @@
 import express from 'express';
 import sensorRoutes from './sensorRoutes.js';
+import plugRoutes from './plugRoutes.js';
 
 const router = express.Router();
 
@@ -10,6 +11,7 @@ router.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       sensors: '/api/sensors',
+      plug: '/api/plug',
       health: '/health'
     }
   });
@@ -17,6 +19,7 @@ router.get('/', (req, res) => {
 
 // Routes
 router.use('/sensors', sensorRoutes);
+router.use('/plug', plugRoutes);
 
 export default router;
 
