@@ -6,6 +6,7 @@ function PlugControl() {
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState(null)
+  const [temperatureInput, setTemperatureInput] = useState(20)
 
   // Status laden
   const fetchStatus = async () => {
@@ -13,6 +14,10 @@ function PlugControl() {
       setError(null)
       const status = await plugAPI.getStatus()
       setPlugStatus(status)
+      // Temperatur-Input mit aktuellem Schwellenwert aktualisieren
+      if (status.temperature_threshold) {
+        setTemperatureInput(status.temperature_threshold)
+      }
     } catch (err) {
       console.error('Fehler beim Laden des Plug-Status:', err)
       setError('Status konnte nicht geladen werden')
@@ -33,7 +38,7 @@ function PlugControl() {
 
   // Status umschalten
   const togglePlug = async () => {
-    if (!plugStatus || switching) return
+    if (!plugStatus || switching || plugStatus.mode === 'auto') return
 
     try {
       setSwitching(true)
@@ -45,6 +50,36 @@ function PlugControl() {
       setError('Schalten fehlgeschlagen')
     } finally {
       setSwitching(false)
+    }
+  }
+
+  // Modus wechseln
+  const toggleMode = async () => {
+    if (!plugStatus || switching) return
+
+    try {
+      setSwitching(true)
+      const newMode = plugStatus.mode === 'manual' ? 'auto' : 'manual'
+      const updatedStatus = await plugAPI.setMode(newMode, temperatureInput)
+      setPlugStatus(updatedStatus)
+    } catch (err) {
+      console.error('Fehler beim Modus-Wechsel:', err)
+      setError('Modus-Wechsel fehlgeschlagen')
+    } finally {
+      setSwitching(false)
+    }
+  }
+
+  // Temperaturschwellenwert ändern
+  const updateTemperature = async () => {
+    if (!plugStatus || plugStatus.mode === 'manual') return
+
+    try {
+      const updatedStatus = await plugAPI.setMode('auto', temperatureInput)
+      setPlugStatus(updatedStatus)
+    } catch (err) {
+      console.error('Fehler beim Setzen der Temperatur:', err)
+      setError('Temperatur-Update fehlgeschlagen')
     }
   }
 
@@ -106,16 +141,91 @@ function PlugControl() {
         </div>
       )}
 
+      {/* Modus-Steuerung */}
+      <div className="mb-6 bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-purple-200">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          {/* Modus-Schalter */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Steuerungsmodus
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleMode}
+                disabled={switching}
+                className={`
+                  relative inline-flex h-10 w-20 items-center rounded-full transition-all duration-300
+                  ${plugStatus?.mode === 'auto' 
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500' 
+                    : 'bg-gray-300'
+                  }
+                  ${switching ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-8 w-8 transform rounded-full bg-white shadow-lg transition-transform duration-300
+                    ${plugStatus?.mode === 'auto' ? 'translate-x-11' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+              <div className="flex flex-col">
+                <span className={`text-sm font-bold ${plugStatus?.mode === 'auto' ? 'text-blue-600' : 'text-gray-600'}`}>
+                  {plugStatus?.mode === 'auto' ? '🤖 Automatik' : '👤 Manuell'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {plugStatus?.mode === 'auto' 
+                    ? 'Temperaturbasiert' 
+                    : 'Manuelles Schalten'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Temperatur-Einstellung (nur bei Auto) */}
+          {plugStatus?.mode === 'auto' && (
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Temperaturschwellenwert
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="5"
+                  max="30"
+                  step="0.5"
+                  value={temperatureInput}
+                  onChange={(e) => setTemperatureInput(parseFloat(e.target.value))}
+                  onBlur={updateTemperature}
+                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-600">°C</span>
+                <button
+                  onClick={updateTemperature}
+                  className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                >
+                  ✓
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Heizung geht an bei &lt; {temperatureInput}°C
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Hauptsteuerung */}
       <div className="flex flex-col md:flex-row gap-6 items-center">
         {/* Toggle Button */}
         <div className="flex-1 flex justify-center">
           <button
             onClick={togglePlug}
-            disabled={switching}
+            disabled={switching || plugStatus?.mode === 'auto'}
             className={`
               relative w-48 h-48 rounded-full shadow-2xl transition-all duration-300 transform
-              ${switching ? 'scale-95 opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}
+              ${switching || plugStatus?.mode === 'auto' ? 'scale-95 opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}
               ${isOn 
                 ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-green-500/50' 
                 : 'bg-gradient-to-br from-gray-300 to-gray-500 shadow-gray-500/50'
@@ -142,6 +252,12 @@ function PlugControl() {
         {/* Status-Details */}
         <div className="flex-1 space-y-4">
           <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">Modus:</span>
+              <span className={`text-sm font-bold ${plugStatus?.mode === 'auto' ? 'text-blue-600' : 'text-gray-600'}`}>
+                {plugStatus?.mode === 'auto' ? '🤖 AUTO' : '👤 MANUELL'}
+              </span>
+            </div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Soll-Status:</span>
               <span className={`text-sm font-bold ${isOn ? 'text-green-600' : 'text-red-600'}`}>
@@ -194,10 +310,14 @@ function PlugControl() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <p className="text-sm text-blue-800 font-medium mb-1">So funktioniert's:</p>
+            <p className="text-sm text-blue-800 font-medium mb-1">
+              {plugStatus?.mode === 'auto' ? '🤖 Automatik-Modus:' : '👤 Manueller Modus:'}
+            </p>
             <p className="text-xs text-blue-700">
-              Der ESP32 fragt alle paar Sekunden den gewünschten Status ab. 
-              Nach dem Umschalten kann es einen Moment dauern, bis die Heizung reagiert.
+              {plugStatus?.mode === 'auto' 
+                ? `Die Heizung schaltet automatisch ein, wenn die Temperatur unter ${temperatureInput}°C fällt. Sie schaltet bei ${(temperatureInput + 0.5).toFixed(1)}°C wieder aus.`
+                : 'Der ESP32 fragt alle paar Sekunden den gewünschten Status ab. Nach dem Umschalten kann es einen Moment dauern, bis die Heizung reagiert.'
+              }
             </p>
           </div>
         </div>

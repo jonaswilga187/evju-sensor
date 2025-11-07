@@ -118,6 +118,52 @@
             },
             "description": "Setzt den gewünschten Status auf 'off'\nESP32 wird beim nächsten Abruf (alle 5 Sek.) die Heizung ausschalten"
           },
+          "response": []
+        },
+        {
+          "name": "Modus auf AUTOMATIK setzen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"auto\",\n  \"temperature_threshold\": 20\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/mode",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "mode"]
+            },
+            "description": "Aktiviert Automatik-Modus\nHeizung schaltet automatisch bei < 20°C ein"
+          },
+          "response": []
+        },
+        {
+          "name": "Modus auf MANUELL setzen",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"manual\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/plug/mode",
+              "host": ["{{base_url}}"],
+              "path": ["api", "plug", "mode"]
+            },
+            "description": "Deaktiviert Automatik-Modus\nHeizung muss manuell gesteuert werden"
+          },
           "response": [
             {
               "name": "Erfolg",

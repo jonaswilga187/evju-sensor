@@ -229,6 +229,37 @@ export const plugAPI = {
       throw error;
     }
   },
+
+  /**
+   * Steuerungsmodus setzen (manual/auto)
+   * @param {string} mode - "manual" oder "auto"
+   * @param {number} temperature_threshold - Optional: Temperaturschwellenwert (5-30°C)
+   * @returns {Promise<Object>} Aktualisierter Status
+   */
+  async setMode(mode, temperature_threshold) {
+    try {
+      const body = { mode };
+      if (temperature_threshold !== undefined) {
+        body.temperature_threshold = temperature_threshold;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/plug/mode`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Setzen des Modus:', error);
+      throw error;
+    }
+  },
 };
 
 export default sensorAPI;

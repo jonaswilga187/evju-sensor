@@ -6,6 +6,19 @@ const plugControlSchema = new mongoose.Schema({
     type: String,
     default: 'shelly_plug_main'
   },
+  // Steuerungsmodus
+  mode: {
+    type: String,
+    enum: ['manual', 'auto'],
+    default: 'manual'
+  },
+  // Temperaturschwellenwert für Automatik-Modus (in °C)
+  temperature_threshold: {
+    type: Number,
+    default: 20.0,
+    min: 5,
+    max: 30
+  },
   // Gewünschter Status (von Website gesetzt, von ESP32 abgerufen)
   desired_state: {
     type: String,
@@ -47,6 +60,8 @@ plugControlSchema.statics.getStatus = async function() {
     // Erstelle initialen Status
     status = await this.create({
       _id: 'shelly_plug_main',
+      mode: 'manual',
+      temperature_threshold: 20.0,
       desired_state: 'off',
       reported_state: 'unknown'
     });
@@ -94,6 +109,27 @@ plugControlSchema.statics.updateReportedState = async function(state) {
       reported_state: state,
       last_reported: new Date()
     },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
+    }
+  );
+};
+
+// Statische Methode: Modus setzen (manual/auto)
+plugControlSchema.statics.setMode = async function(mode, threshold) {
+  const update = {
+    mode: mode
+  };
+  
+  if (threshold !== undefined) {
+    update.temperature_threshold = threshold;
+  }
+  
+  return await this.findByIdAndUpdate(
+    'shelly_plug_main',
+    update,
     {
       new: true,
       upsert: true,

@@ -7,6 +7,11 @@
  * - Sendet Daten an API
  * - Fragt API nach gewünschtem Heizungs-Status
  * - Steuert Heizung (über Shelly Plug) per HTTP
+ * - Unterstützt Automatik-Modus (API entscheidet basierend auf Temperatur)
+ * 
+ * Modi:
+ * - Manuell: Website steuert direkt
+ * - Automatik: API schaltet basierend auf Temperaturschwellenwert
  * 
  * Hardware:
  * - ESP32
@@ -189,6 +194,10 @@ void sendDataToAPI(float temp, float hum, float power) {
   if (httpCode > 0) {
     if (httpCode == 201) {
       Serial.println("✓ Daten erfolgreich gesendet!");
+    } else if (httpCode == 429) {
+      Serial.println("⚠ Rate Limit erreicht (429) - Warte länger...");
+      // Bei Rate Limit: Nächsten Request verzögern
+      lastSensorRead += 30000;  // +30 Sekunden extra warten
     } else {
       Serial.printf("✗ API Fehler: %d\n", httpCode);
       Serial.println(http.getString());
@@ -252,9 +261,14 @@ String getDesiredStateFromAPI() {
     
     http.end();
     return state;
+  } else if (httpCode == 429) {
+    Serial.println("⚠ Rate Limit erreicht (429) - Überspringe diesen Check");
+    http.end();
+    return currentPlugState;  // Aktuellen Status beibehalten
   }
   
   http.end();
+  Serial.printf("✗ API Fehler: %d\n", httpCode);
   return "error";
 }
 
@@ -290,6 +304,10 @@ void reportStateToAPI(String state) {
   
   if (httpCode == 200) {
     Serial.println("✓ Status an API gemeldet");
+  } else if (httpCode == 429) {
+    Serial.println("⚠ Rate Limit erreicht (429) - Status-Meldung übersprungen");
+  } else {
+    Serial.printf("✗ Fehler beim Melden: %d\n", httpCode);
   }
   
   http.end();

@@ -90,3 +90,33 @@ export const updateReportedState = async (req, res, next) => {
   }
 };
 
+// PUT /api/plug/mode - Modus setzen (manual/auto) mit optionalem Schwellenwert
+export const setMode = async (req, res, next) => {
+  try {
+    const { mode, temperature_threshold } = req.body;
+    
+    if (!mode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Modus ist erforderlich (manual oder auto)'
+      });
+    }
+    
+    const data = await plugService.setMode(mode, temperature_threshold);
+    
+    res.status(200).json({
+      success: true,
+      message: `Modus auf "${mode}" gesetzt${temperature_threshold ? ` (Schwellenwert: ${temperature_threshold}°C)` : ''}`,
+      data
+    });
+  } catch (error) {
+    if (error.message.includes('muss')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    next(error);
+  }
+};
+

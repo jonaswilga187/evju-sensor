@@ -12,6 +12,9 @@ router.get('/status', plugController.getStatus);
 // PUT /api/plug/desired - Für Website: Gewünschten Status setzen
 router.put('/desired', plugController.setDesiredState);
 
+// PUT /api/plug/mode - Für Website: Modus setzen (manual/auto)
+router.put('/mode', plugController.setMode);
+
 // POST /api/plug/reported - Für ESP32: Aktuellen Status melden
 router.post('/reported', plugController.updateReportedState);
 
