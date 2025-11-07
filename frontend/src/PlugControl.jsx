@@ -7,19 +7,33 @@ function PlugControl() {
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState(null)
   const [temperatureInput, setTemperatureInput] = useState(20)
+  const [hysteresisInput, setHysteresisInput] = useState(0.5)
 
   // Status laden
   const fetchStatus = async () => {
     try {
       setError(null)
       const status = await plugAPI.getStatus()
+      
+      // 🔍 DEBUG-Logging für Browser-Konsole
+      console.log('📊 Status geladen:', {
+        modus: status.mode,
+        schwellenwert: status.temperature_threshold,
+        soll_status: status.desired_state,
+        ist_status: status.reported_state,
+        letzter_abruf: status.last_fetched
+      })
+      
       setPlugStatus(status)
       // Temperatur-Input mit aktuellem Schwellenwert aktualisieren
       if (status.temperature_threshold) {
         setTemperatureInput(status.temperature_threshold)
       }
+      if (status.hysteresis !== undefined) {
+        setHysteresisInput(status.hysteresis)
+      }
     } catch (err) {
-      console.error('Fehler beim Laden des Plug-Status:', err)
+      console.error('❌ Fehler beim Laden des Plug-Status:', err)
       setError('Status konnte nicht geladen werden')
     } finally {
       setLoading(false)
@@ -43,10 +57,15 @@ function PlugControl() {
     try {
       setSwitching(true)
       const newState = plugStatus.desired_state === 'on' ? 'off' : 'on'
+      
+      console.log(`🔌 Manuelles Schalten: ${plugStatus.desired_state.toUpperCase()} → ${newState.toUpperCase()}`)
+      
       const updatedStatus = await plugAPI.setDesiredState(newState)
       setPlugStatus(updatedStatus)
+      
+      console.log(`✅ Status gesetzt auf ${newState.toUpperCase()}`)
     } catch (err) {
-      console.error('Fehler beim Schalten:', err)
+      console.error('❌ Fehler beim Schalten:', err)
       setError('Schalten fehlgeschlagen')
     } finally {
       setSwitching(false)
@@ -60,26 +79,48 @@ function PlugControl() {
     try {
       setSwitching(true)
       const newMode = plugStatus.mode === 'manual' ? 'auto' : 'manual'
-      const updatedStatus = await plugAPI.setMode(newMode, temperatureInput)
+      
+      console.log(`🔄 Modus-Wechsel: ${plugStatus.mode.toUpperCase()} → ${newMode.toUpperCase()}`, {
+        temperatur_schwellenwert: temperatureInput,
+        hysterese: hysteresisInput
+      })
+      
+      const updatedStatus = await plugAPI.setMode(newMode, temperatureInput, hysteresisInput)
       setPlugStatus(updatedStatus)
+      
+      console.log(`✅ Modus geändert:`, {
+        neuer_modus: updatedStatus.mode,
+        schwellenwert: updatedStatus.temperature_threshold,
+        hysterese: updatedStatus.hysteresis
+      })
     } catch (err) {
-      console.error('Fehler beim Modus-Wechsel:', err)
+      console.error('❌ Fehler beim Modus-Wechsel:', err)
       setError('Modus-Wechsel fehlgeschlagen')
     } finally {
       setSwitching(false)
     }
   }
 
-  // Temperaturschwellenwert ändern
-  const updateTemperature = async () => {
+  // Temperaturschwellenwert oder Hysterese ändern
+  const updateSettings = async () => {
     if (!plugStatus || plugStatus.mode === 'manual') return
 
     try {
-      const updatedStatus = await plugAPI.setMode('auto', temperatureInput)
+      console.log(`🌡️ Einstellungen ändern:`, {
+        temperatur: `${plugStatus.temperature_threshold}°C → ${temperatureInput}°C`,
+        hysterese: `${plugStatus.hysteresis}°C → ${hysteresisInput}°C`
+      })
+      
+      const updatedStatus = await plugAPI.setMode('auto', temperatureInput, hysteresisInput)
       setPlugStatus(updatedStatus)
+      
+      console.log(`✅ Einstellungen aktualisiert`, {
+        temperatur: temperatureInput,
+        hysterese: hysteresisInput
+      })
     } catch (err) {
-      console.error('Fehler beim Setzen der Temperatur:', err)
-      setError('Temperatur-Update fehlgeschlagen')
+      console.error('❌ Fehler beim Aktualisieren der Einstellungen:', err)
+      setError('Einstellungen-Update fehlgeschlagen')
     }
   }
 
@@ -185,32 +226,56 @@ function PlugControl() {
 
           {/* Temperatur-Einstellung (nur bei Auto) */}
           {plugStatus?.mode === 'auto' && (
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Temperaturschwellenwert
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="5"
-                  max="30"
-                  step="0.5"
-                  value={temperatureInput}
-                  onChange={(e) => setTemperatureInput(parseFloat(e.target.value))}
-                  onBlur={updateTemperature}
-                  className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-600">°C</span>
-                <button
-                  onClick={updateTemperature}
-                  className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                >
-                  ✓
-                </button>
+            <div className="flex-1 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Temperaturschwellenwert
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="5"
+                    max="30"
+                    step="0.5"
+                    value={temperatureInput}
+                    onChange={(e) => setTemperatureInput(parseFloat(e.target.value))}
+                    onBlur={updateSettings}
+                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-600">°C</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Heizung EIN bei &lt; {temperatureInput}°C
+                </p>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Heizung geht an bei &lt; {temperatureInput}°C
-              </p>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hysterese (Puffer)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={hysteresisInput}
+                    onChange={(e) => setHysteresisInput(parseFloat(e.target.value))}
+                    onBlur={updateSettings}
+                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-600">°C</span>
+                  <button
+                    onClick={updateSettings}
+                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                  >
+                    ✓
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Heizung AUS bei ≥ {(temperatureInput + hysteresisInput).toFixed(1)}°C
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -315,7 +380,7 @@ function PlugControl() {
             </p>
             <p className="text-xs text-blue-700">
               {plugStatus?.mode === 'auto' 
-                ? `Die Heizung schaltet automatisch ein, wenn die Temperatur unter ${temperatureInput}°C fällt. Sie schaltet bei ${(temperatureInput + 0.5).toFixed(1)}°C wieder aus.`
+                ? `Die Heizung schaltet automatisch ein, wenn die Temperatur unter ${temperatureInput}°C fällt. Sie schaltet bei ${(temperatureInput + hysteresisInput).toFixed(1)}°C wieder aus. Die Hysterese von ${hysteresisInput}°C verhindert ständiges Ein/Ausschalten.`
                 : 'Der ESP32 fragt alle paar Sekunden den gewünschten Status ab. Nach dem Umschalten kann es einen Moment dauern, bis die Heizung reagiert.'
               }
             </p>

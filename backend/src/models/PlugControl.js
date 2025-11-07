@@ -19,6 +19,13 @@ const plugControlSchema = new mongoose.Schema({
     min: 5,
     max: 30
   },
+  // Hysterese (Temperatur-Puffer in °C)
+  hysteresis: {
+    type: Number,
+    default: 0.5,
+    min: 0,
+    max: 5
+  },
   // Gewünschter Status (von Website gesetzt, von ESP32 abgerufen)
   desired_state: {
     type: String,
@@ -62,6 +69,7 @@ plugControlSchema.statics.getStatus = async function() {
       _id: 'shelly_plug_main',
       mode: 'manual',
       temperature_threshold: 20.0,
+      hysteresis: 0.5,
       desired_state: 'off',
       reported_state: 'unknown'
     });
@@ -118,13 +126,17 @@ plugControlSchema.statics.updateReportedState = async function(state) {
 };
 
 // Statische Methode: Modus setzen (manual/auto)
-plugControlSchema.statics.setMode = async function(mode, threshold) {
+plugControlSchema.statics.setMode = async function(mode, threshold, hysteresis) {
   const update = {
     mode: mode
   };
   
   if (threshold !== undefined) {
     update.temperature_threshold = threshold;
+  }
+  
+  if (hysteresis !== undefined) {
+    update.hysteresis = hysteresis;
   }
   
   return await this.findByIdAndUpdate(

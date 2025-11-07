@@ -90,10 +90,10 @@ export const updateReportedState = async (req, res, next) => {
   }
 };
 
-// PUT /api/plug/mode - Modus setzen (manual/auto) mit optionalem Schwellenwert
+// PUT /api/plug/mode - Modus setzen (manual/auto) mit optionalem Schwellenwert + Hysterese
 export const setMode = async (req, res, next) => {
   try {
-    const { mode, temperature_threshold } = req.body;
+    const { mode, temperature_threshold, hysteresis } = req.body;
     
     if (!mode) {
       return res.status(400).json({
@@ -102,11 +102,15 @@ export const setMode = async (req, res, next) => {
       });
     }
     
-    const data = await plugService.setMode(mode, temperature_threshold);
+    const data = await plugService.setMode(mode, temperature_threshold, hysteresis);
+    
+    let message = `Modus auf "${mode}" gesetzt`;
+    if (temperature_threshold) message += ` (Schwellenwert: ${temperature_threshold}°C)`;
+    if (hysteresis !== undefined) message += ` (Hysterese: ${hysteresis}°C)`;
     
     res.status(200).json({
       success: true,
-      message: `Modus auf "${mode}" gesetzt${temperature_threshold ? ` (Schwellenwert: ${temperature_threshold}°C)` : ''}`,
+      message,
       data
     });
   } catch (error) {

@@ -234,13 +234,17 @@ export const plugAPI = {
    * Steuerungsmodus setzen (manual/auto)
    * @param {string} mode - "manual" oder "auto"
    * @param {number} temperature_threshold - Optional: Temperaturschwellenwert (5-30°C)
+   * @param {number} hysteresis - Optional: Hysterese (0-5°C)
    * @returns {Promise<Object>} Aktualisierter Status
    */
-  async setMode(mode, temperature_threshold) {
+  async setMode(mode, temperature_threshold, hysteresis) {
     try {
       const body = { mode };
       if (temperature_threshold !== undefined) {
         body.temperature_threshold = temperature_threshold;
+      }
+      if (hysteresis !== undefined) {
+        body.hysteresis = hysteresis;
       }
       
       const response = await fetch(`${API_BASE_URL}/plug/mode`, {
