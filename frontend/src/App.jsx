@@ -4,23 +4,20 @@ import { sensorAPI } from './services/api'
 import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
 
-// Spannung für Ampere-Berechnung (Deutschland: 230V)
-const SPANNUNG = 230 // Volt
-
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
-  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, ampere: 320/SPANNUNG },
-  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, ampere: 280/SPANNUNG },
-  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, ampere: 250/SPANNUNG },
-  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, ampere: 310/SPANNUNG },
-  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, ampere: 450/SPANNUNG },
-  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, ampere: 580/SPANNUNG },
-  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, ampere: 720/SPANNUNG },
-  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, ampere: 850/SPANNUNG },
-  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, ampere: 780/SPANNUNG },
-  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, ampere: 920/SPANNUNG },
-  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, ampere: 650/SPANNUNG },
-  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, ampere: 480/SPANNUNG },
+  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, kwh_kumulativ: 0.32 },
+  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, kwh_kumulativ: 0.88 },
+  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, kwh_kumulativ: 1.38 },
+  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, kwh_kumulativ: 2.00 },
+  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, kwh_kumulativ: 2.90 },
+  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, kwh_kumulativ: 4.06 },
+  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, kwh_kumulativ: 5.50 },
+  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, kwh_kumulativ: 7.20 },
+  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, kwh_kumulativ: 8.76 },
+  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, kwh_kumulativ: 10.60 },
+  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, kwh_kumulativ: 11.90 },
+  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, kwh_kumulativ: 12.86 },
 ]
 
 // Custom Tooltip für moderne Darstellung
@@ -30,7 +27,7 @@ const CustomTooltip = ({ active, payload }) => {
       if (name === 'temperatur') return '°C'
       if (name === 'feuchtigkeit') return '%'
       if (name === 'stromverbrauch') return 'W'
-      if (name === 'ampere') return 'A'
+      if (name === 'kwh_kumulativ') return 'kWh'
       return ''
     }
 
@@ -75,17 +72,31 @@ function App() {
           sensorAPI.getAverages()
         ])
 
-        // Zeitstempel formatieren für Charts
-        const formattedData = chartData.map(item => ({
-          zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          temperatur: item.temperatur,
-          feuchtigkeit: item.luftfeuchtigkeit,
-          stromverbrauch: item.stromverbrauch,
-          ampere: parseFloat((item.stromverbrauch / SPANNUNG).toFixed(2)) // Watt / 230V = Ampere
-        }))
+        // Zeitstempel formatieren und kumulativen kWh-Wert berechnen
+        let kwhAkkumulator = 0
+        const formattedData = chartData.map((item, index) => {
+          // Zeitdifferenz zum vorherigen Messpunkt in Stunden berechnen
+          if (index > 0) {
+            const currentTime = new Date(item.zeitstempel)
+            const previousTime = new Date(chartData[index - 1].zeitstempel)
+            const hoursDiff = (currentTime - previousTime) / (1000 * 60 * 60)
+            
+            // Durchschnittlicher Verbrauch zwischen den Punkten in kWh
+            const avgWatt = (item.stromverbrauch + chartData[index - 1].stromverbrauch) / 2
+            kwhAkkumulator += (avgWatt / 1000) * hoursDiff
+          }
+          
+          return {
+            zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            temperatur: item.temperatur,
+            feuchtigkeit: item.luftfeuchtigkeit,
+            stromverbrauch: item.stromverbrauch,
+            kwh_kumulativ: parseFloat(kwhAkkumulator.toFixed(2))
+          }
+        })
 
         setData(formattedData)
         setAverages(avgData)
@@ -326,7 +337,7 @@ function App() {
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
                   </linearGradient>
-                  <linearGradient id="colorAmpere" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorKWh" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
                     <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
                   </linearGradient>
@@ -349,8 +360,8 @@ function App() {
                   orientation="right"
                   stroke="#8b5cf6"
                   style={{ fontSize: '14px' }}
-                  label={{ value: 'A', angle: 0, position: 'insideRight', offset: 10, style: { fill: '#8b5cf6', textAnchor: 'middle' } }}
-                  domain={[0, 16]}
+                  label={{ value: 'kWh', angle: 0, position: 'insideRight', offset: 10, style: { fill: '#8b5cf6', textAnchor: 'middle' } }}
+                  domain={[0, 'auto']}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
@@ -369,12 +380,12 @@ function App() {
                 />
                 <Area
                   type="monotone"
-                  dataKey="ampere"
+                  dataKey="kwh_kumulativ"
                   stroke="#8b5cf6"
                   strokeWidth={2}
                   fillOpacity={0.6}
-                  fill="url(#colorAmpere)"
-                  name="ampere"
+                  fill="url(#colorKWh)"
+                  name="kWh (kumulativ)"
                   yAxisId="right"
                 />
               </AreaChart>
