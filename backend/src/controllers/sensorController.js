@@ -182,4 +182,38 @@ export const getStats = async (req, res, next) => {
   }
 };
 
+// GET /api/sensors/day - Daten für einen bestimmten Tag
+export const getDataByDate = async (req, res, next) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Datum ist erforderlich (Format: YYYY-MM-DD)'
+      });
+    }
+
+    const requestedDate = new Date(date);
+
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ungültiges Datumsformat (erwartet: YYYY-MM-DD)'
+      });
+    }
+
+    const data = await sensorService.getDataByDate(requestedDate);
+
+    res.status(200).json({
+      success: true,
+      count: data.length,
+      date: date,
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 

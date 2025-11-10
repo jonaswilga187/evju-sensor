@@ -59,4 +59,23 @@ export const getStats = async () => {
   };
 };
 
+// Daten für einen kompletten Tag abrufen (00:00 - 23:59)
+export const getDataByDate = async (date) => {
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return await SensorMesswert.find({
+    zeitstempel: {
+      $gte: startOfDay,
+      $lte: endOfDay
+    }
+  })
+  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch -_id')
+  .sort({ zeitstempel: 1 })
+  .lean();
+};
+
 

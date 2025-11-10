@@ -9,6 +9,7 @@ router.get('/24h', sensorController.get24HourData);
 router.get('/averages', sensorController.get24HourAverages);
 router.get('/hourly', sensorController.getHourlyData);
 router.get('/range', sensorController.getDataByRange);
+router.get('/day', sensorController.getDataByDate);
 router.get('/stats', sensorController.getStats);
 
 // POST Routes
