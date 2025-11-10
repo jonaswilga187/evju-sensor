@@ -110,6 +110,25 @@ export const sensorAPI = {
   },
 
   /**
+   * Daten für einen bestimmten Tag abrufen (00:00 - 23:59)
+   * @param {string} date - Datum im Format YYYY-MM-DD
+   * @returns {Promise<Array>} Array mit Messwerten des Tages
+   */
+  async getDataByDate(date) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/sensors/day?date=${date}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Tages-Daten:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Neuen Messwert erstellen
    * @param {Object} messwert - Messwert Objekt
    * @param {number} messwert.temperatur - Temperatur in °C

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sensorAPI } from './services/api'
+import DayComparison from './DayComparison'
 
 // Custom Tooltip für moderne Darstellung
 const CustomTooltip = ({ active, payload }) => {
@@ -310,6 +311,7 @@ function App() {
                   stroke="#6b7280"
                   style={{ fontSize: '14px' }}
                   label={{ value: 'Watt', angle: -90, position: 'insideLeft', style: { fill: '#6b7280' } }}
+                  domain={[0, 3600]}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
@@ -327,6 +329,11 @@ function App() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Tagesvergleich */}
+          <div className="mb-8">
+            <DayComparison />
           </div>
         </div>
       </div>

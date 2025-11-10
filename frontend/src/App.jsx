@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sensorAPI } from './services/api'
 import PlugControl from './PlugControl'
+import DayComparison from './DayComparison'
 
 // Spannung für Ampere-Berechnung (Deutschland: 230V)
 const SPANNUNG = 230 // Volt
@@ -341,7 +342,7 @@ function App() {
                   stroke="#10b981"
                   style={{ fontSize: '14px' }}
                   label={{ value: 'W', angle: 0, position: 'insideLeft', offset: 10, style: { fill: '#10b981', textAnchor: 'middle' } }}
-                  domain={[0, 1000]}
+                  domain={[0, 3600]}
                 />
                 <YAxis 
                   yAxisId="right"
@@ -383,6 +384,11 @@ function App() {
           {/* Heizung Steuerung */}
           <div className="mb-8">
             <PlugControl />
+          </div>
+
+          {/* Tagesvergleich */}
+          <div className="mb-8">
+            <DayComparison />
           </div>
         </div>
       </div>
