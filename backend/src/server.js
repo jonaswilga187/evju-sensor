@@ -7,6 +7,7 @@ import connectDB from './config/database.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
 import routes from './routes/index.js';
+import { checkVerbrauchAlarm } from './services/verbrauchAlarmService.js';
 
 // Umgebungsvariablen laden
 dotenv.config();
@@ -45,9 +46,6 @@ app.get('/health', (req, res) => {
 
 // Error Handler (muss am Ende sein)
 app.use(errorHandler);
-
-// Verbrauch-Alarm-Service importieren
-import { checkVerbrauchAlarm } from './services/verbrauchAlarmService.js';
 
 // Server starten
 app.listen(PORT, () => {
