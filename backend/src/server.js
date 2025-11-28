@@ -46,11 +46,30 @@ app.get('/health', (req, res) => {
 // Error Handler (muss am Ende sein)
 app.use(errorHandler);
 
+// Verbrauch-Alarm-Service importieren
+import { checkVerbrauchAlarm } from './services/verbrauchAlarmService.js';
+
 // Server starten
 app.listen(PORT, () => {
   console.log(`🚀 Server läuft auf Port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN}`);
+  
+  // Verbrauch-Alarm-Prüfung einrichten
+  const checkInterval = parseInt(process.env.VERBRAUCH_CHECK_INTERVAL_MINUTES) || 60; // Standard: alle 60 Minuten
+  const checkIntervalMs = checkInterval * 60 * 1000;
+  
+  console.log(`📧 Verbrauch-Alarm-Prüfung alle ${checkInterval} Minuten aktiviert`);
+  
+  // Sofort beim Start prüfen (nach kurzer Verzögerung, damit DB verbunden ist)
+  setTimeout(() => {
+    checkVerbrauchAlarm();
+  }, 10000); // 10 Sekunden nach Start
+  
+  // Regelmäßig prüfen
+  setInterval(() => {
+    checkVerbrauchAlarm();
+  }, checkIntervalMs);
 });
 
 export default app;

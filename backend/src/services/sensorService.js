@@ -78,4 +78,44 @@ export const getDataByDate = async (date) => {
   .lean();
 };
 
+// Täglichen Verbrauch in kWh berechnen (tatsächlicher Verbrauch, nicht Durchschnitt)
+export const getDailyKwhConsumption = async (date = new Date()) => {
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const data = await SensorMesswert.find({
+    zeitstempel: {
+      $gte: startOfDay,
+      $lte: endOfDay
+    }
+  })
+  .select('zeitstempel stromverbrauch')
+  .sort({ zeitstempel: 1 })
+  .lean();
+
+  if (data.length < 2) {
+    // Nicht genug Daten für Berechnung
+    return 0;
+  }
+
+  // Kumulativen Verbrauch berechnen (Trapezregel)
+  let totalKwh = 0;
+  for (let i = 1; i < data.length; i++) {
+    const currentTime = new Date(data[i].zeitstempel);
+    const previousTime = new Date(data[i - 1].zeitstempel);
+    const hoursDiff = (currentTime - previousTime) / (1000 * 60 * 60); // Stunden
+    
+    // Durchschnittlicher Verbrauch zwischen den beiden Messpunkten
+    const avgWatt = (data[i].stromverbrauch + data[i - 1].stromverbrauch) / 2;
+    
+    // Energie in kWh = (Watt * Stunden) / 1000
+    totalKwh += (avgWatt / 1000) * hoursDiff;
+  }
+
+  return parseFloat(totalKwh.toFixed(2));
+};
+
 
