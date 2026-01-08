@@ -8,6 +8,9 @@ backend/node_modules/
 .env.local
 .env.*.local
 
+# Docker Compose (lokal angepasst, nicht committen)
+docker-compose.yml
+
 # Build Output
 dist/
 build/
