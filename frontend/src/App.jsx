@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react'
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { sensorAPI } from './services/api'
+import { AreaChart, Area, LineChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { sensorAPI, weatherAPI } from './services/api'
 import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
-  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, kwh_kumulativ: 0.32 },
-  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, kwh_kumulativ: 0.88 },
-  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, kwh_kumulativ: 1.38 },
-  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, kwh_kumulativ: 2.00 },
-  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, kwh_kumulativ: 2.90 },
-  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, kwh_kumulativ: 4.06 },
-  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, kwh_kumulativ: 5.50 },
-  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, kwh_kumulativ: 7.20 },
-  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, kwh_kumulativ: 8.76 },
-  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, kwh_kumulativ: 10.60 },
-  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, kwh_kumulativ: 11.90 },
-  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, kwh_kumulativ: 12.86 },
+  { zeit: '00:00', temperatur: 18.5, feuchtigkeit: 65, stromverbrauch: 320, kwh_kumulativ: 0.32, außentemperatur: 5.2 },
+  { zeit: '02:00', temperatur: 17.8, feuchtigkeit: 68, stromverbrauch: 280, kwh_kumulativ: 0.88, außentemperatur: 4.8 },
+  { zeit: '04:00', temperatur: 17.2, feuchtigkeit: 70, stromverbrauch: 250, kwh_kumulativ: 1.38, außentemperatur: 4.5 },
+  { zeit: '06:00', temperatur: 16.9, feuchtigkeit: 72, stromverbrauch: 310, kwh_kumulativ: 2.00, außentemperatur: 4.2 },
+  { zeit: '08:00', temperatur: 18.5, feuchtigkeit: 68, stromverbrauch: 450, kwh_kumulativ: 2.90, außentemperatur: 5.0 },
+  { zeit: '10:00', temperatur: 21.3, feuchtigkeit: 60, stromverbrauch: 580, kwh_kumulativ: 4.06, außentemperatur: 7.5 },
+  { zeit: '12:00', temperatur: 24.1, feuchtigkeit: 55, stromverbrauch: 720, kwh_kumulativ: 5.50, außentemperatur: 10.2 },
+  { zeit: '14:00', temperatur: 26.5, feuchtigkeit: 50, stromverbrauch: 850, kwh_kumulativ: 7.20, außentemperatur: 12.8 },
+  { zeit: '16:00', temperatur: 27.2, feuchtigkeit: 48, stromverbrauch: 780, kwh_kumulativ: 8.76, außentemperatur: 11.5 },
+  { zeit: '18:00', temperatur: 25.8, feuchtigkeit: 52, stromverbrauch: 920, kwh_kumulativ: 10.60, außentemperatur: 9.2 },
+  { zeit: '20:00', temperatur: 22.4, feuchtigkeit: 58, stromverbrauch: 650, kwh_kumulativ: 11.90, außentemperatur: 7.8 },
+  { zeit: '22:00', temperatur: 20.1, feuchtigkeit: 62, stromverbrauch: 480, kwh_kumulativ: 12.86, außentemperatur: 6.5 },
 ]
 
 // Custom Tooltip für moderne Darstellung
@@ -25,10 +25,16 @@ const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const getUnit = (name) => {
       if (name === 'temperatur') return '°C'
+      if (name === 'außentemperatur') return '°C'
       if (name === 'feuchtigkeit') return '%'
       if (name === 'stromverbrauch') return 'W'
       if (name === 'kwh_kumulativ') return 'kWh'
       return ''
+    }
+
+    const getLabel = (name) => {
+      if (name === 'außentemperatur') return 'Außentemperatur'
+      return name.charAt(0).toUpperCase() + name.slice(1)
     }
 
     return (
@@ -40,9 +46,9 @@ const CustomTooltip = ({ active, payload }) => {
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-sm text-gray-600 capitalize">{entry.name}:</span>
+            <span className="text-sm text-gray-600">{getLabel(entry.name)}:</span>
             <span className="text-sm font-semibold text-gray-800">
-              {entry.value}{getUnit(entry.name)}
+              {entry.value?.toFixed(1)}{getUnit(entry.name)}
             </span>
           </div>
         ))}
@@ -66,11 +72,17 @@ function App() {
         setLoading(true)
         setError(null)
 
-        // Parallel beide API-Aufrufe
-        const [chartData, avgData] = await Promise.all([
+        // Parallel alle API-Aufrufe (Sensordaten, Durchschnitte, Wetterdaten)
+        const [chartData, avgData, weatherData] = await Promise.all([
           sensorAPI.get24HourData(),
-          sensorAPI.getAverages()
+          sensorAPI.getAverages(),
+          weatherAPI.get24HourTemperature().catch(err => {
+            console.warn('Wetterdaten konnten nicht geladen werden:', err)
+            return null
+          })
         ])
+
+        console.log('Wetterdaten geladen:', weatherData?.length || 0, 'Einträge')
 
         // Zeitstempel formatieren und kumulativen kWh-Wert berechnen
         let kwhAkkumulator = 0
@@ -86,6 +98,34 @@ function App() {
             kwhAkkumulator += (avgWatt / 1000) * hoursDiff
           }
           
+          // Außentemperatur für diesen Zeitpunkt finden
+          let außentemperatur = null
+          if (weatherData && weatherData.length > 0) {
+            const sensorTime = new Date(item.zeitstempel)
+            // Finde den nächsten Wetterdaten-Punkt (innerhalb von 1 Stunde)
+            const matchingWeather = weatherData.find(w => {
+              const weatherTime = new Date(w.time)
+              const diffMinutes = Math.abs((sensorTime - weatherTime) / (1000 * 60))
+              return diffMinutes <= 60 // Maximal 60 Minuten Unterschied
+            })
+            
+            if (matchingWeather) {
+              außentemperatur = matchingWeather.temperature
+            } else {
+              // Fallback: Nächster verfügbarer Wert (ohne Interpolation für bessere Performance)
+              const sortedWeather = [...weatherData].sort((a, b) => 
+                Math.abs(new Date(a.time) - sensorTime) - Math.abs(new Date(b.time) - sensorTime)
+              )
+              if (sortedWeather.length > 0) {
+                const closest = sortedWeather[0]
+                const diffHours = Math.abs((new Date(closest.time) - sensorTime) / (1000 * 60 * 60))
+                if (diffHours <= 2) { // Maximal 2 Stunden Unterschied
+                  außentemperatur = closest.temperature
+                }
+              }
+            }
+          }
+          
           return {
             zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', { 
               hour: '2-digit', 
@@ -94,9 +134,14 @@ function App() {
             temperatur: item.temperatur,
             feuchtigkeit: item.luftfeuchtigkeit,
             stromverbrauch: item.stromverbrauch,
-            kwh_kumulativ: parseFloat(kwhAkkumulator.toFixed(2))
+            kwh_kumulativ: parseFloat(kwhAkkumulator.toFixed(2)),
+            außentemperatur: außentemperatur !== null ? parseFloat(außentemperatur.toFixed(1)) : null
           }
         })
+
+        // Debug: Prüfe ob Außentemperatur-Daten vorhanden sind
+        const dataWithTemp = formattedData.filter(d => d.außentemperatur !== null)
+        console.log('Daten mit Außentemperatur:', dataWithTemp.length, 'von', formattedData.length)
 
         setData(formattedData)
         setAverages(avgData)
@@ -256,7 +301,7 @@ function App() {
               Temperatur & Luftfeuchtigkeit (24h)
             </h2>
             <ResponsiveContainer width="100%" height={350}>
-              <AreaChart
+              <ComposedChart
                 data={data}
                 margin={{ top: 10, right: 60, left: 0, bottom: 0 }}
               >
@@ -296,7 +341,10 @@ function App() {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{ paddingTop: '20px' }}
-                  formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
+                  formatter={(value) => {
+                    if (value === 'außentemperatur') return 'Außentemperatur'
+                    return value.charAt(0).toUpperCase() + value.slice(1)
+                  }}
                 />
                 <Area
                   type="monotone"
@@ -308,6 +356,16 @@ function App() {
                   name="temperatur"
                   yAxisId="left"
                 />
+                <Line
+                  type="monotone"
+                  dataKey="außentemperatur"
+                  stroke="#6b7280"
+                  strokeWidth={2}
+                  dot={{ fill: '#6b7280', r: 3 }}
+                  name="außentemperatur"
+                  yAxisId="left"
+                  connectNulls={true}
+                />
                 <Area
                   type="monotone"
                   dataKey="feuchtigkeit"
@@ -318,7 +376,7 @@ function App() {
                   name="feuchtigkeit"
                   yAxisId="right"
                 />
-              </AreaChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
 

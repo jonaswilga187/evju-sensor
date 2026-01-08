@@ -285,5 +285,43 @@ export const plugAPI = {
   },
 };
 
+/**
+ * Weather API Service
+ * Wetterdaten von Open-Meteo API abrufen
+ */
+export const weatherAPI = {
+  /**
+   * Außentemperatur für die letzten 24 Stunden abrufen
+   * @param {number} latitude - Breitengrad (default: 52.62 für Celle)
+   * @param {number} longitude - Längengrad (default: 10.08 für Celle)
+   * @returns {Promise<Array>} Array mit {time: string, temperature: number}
+   */
+  async get24HourTemperature(latitude = 52.62, longitude = 10.08) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&past_days=1&timezone=Europe/Berlin`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Daten formatieren: Array von {time, temperature}
+      if (data.hourly && data.hourly.time && data.hourly.temperature_2m) {
+        return data.hourly.time.map((time, index) => ({
+          time: time,
+          temperature: data.hourly.temperature_2m[index]
+        }));
+      }
+      
+      throw new Error('Ungültiges Datenformat von Open-Meteo API');
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Wetterdaten:', error);
+      throw error;
+    }
+  },
+};
+
 export default sensorAPI;
 
