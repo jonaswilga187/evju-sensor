@@ -281,11 +281,12 @@ function App() {
                   type="monotone"
                   dataKey="temperatur"
                   stroke="#f97316"
-                  strokeWidth={3}
+                  strokeWidth={2}
                   dot={{ fill: '#f97316', r: 4 }}
                   activeDot={{ r: 6 }}
                   name="temperatur"
                   yAxisId="left"
+                  isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
