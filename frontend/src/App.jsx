@@ -3,6 +3,7 @@ import { AreaChart, Area, LineChart, Line, ComposedChart, XAxis, YAxis, Cartesia
 import { sensorAPI, weatherAPI } from './services/api'
 import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
+import TemperatureCycles from './TemperatureCycles'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
@@ -458,6 +459,11 @@ function App() {
           {/* Tagesvergleich */}
           <div className="mb-8">
             <DayComparison />
+          </div>
+
+          {/* Temperatur-Zyklen */}
+          <div className="mb-8">
+            <TemperatureCycles />
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { sensorAPI } from './services/api'
 import DayComparison from './DayComparison'
+import TemperatureCycles from './TemperatureCycles'
 
 // Custom Tooltip für moderne Darstellung
 const CustomTooltip = ({ active, payload }) => {
@@ -379,6 +380,11 @@ function App() {
           {/* Tagesvergleich */}
           <div className="mb-8">
             <DayComparison />
+          </div>
+
+          {/* Temperatur-Zyklen */}
+          <div className="mb-8">
+            <TemperatureCycles />
           </div>
         </div>
       </div>

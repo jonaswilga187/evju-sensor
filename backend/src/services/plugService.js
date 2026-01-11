@@ -1,5 +1,12 @@
 import PlugControl from '../models/PlugControl.js';
 import SensorMesswert from '../models/SensorMesswert.js';
+import * as temperatureCycleService from './temperatureCycleService.js';
+
+// In-Memory State für laufende Zyklen
+const activeCycles = {
+  heating: null,  // { startTime, startTemperature, threshold, hysteresis, mode }
+  cooling: null   // { startTime, startTemperature, threshold, hysteresis, mode }
+};
 
 // Status für ESP32 abrufen (ESP32 fragt: "Was soll ich tun?")
 export const getDesiredStateForESP = async () => {
@@ -37,7 +44,15 @@ export const setDesiredState = async (state) => {
     throw new Error('Status muss "on" oder "off" sein');
   }
   
-  return await PlugControl.setDesiredState(state);
+  const oldStatus = await PlugControl.getStatus();
+  const newStatus = await PlugControl.setDesiredState(state);
+  
+  // Zyklus-Erkennung bei manueller Status-Änderung
+  if (oldStatus.desired_state !== state) {
+    await handleStateChange(oldStatus.desired_state, state, oldStatus);
+  }
+  
+  return newStatus;
 };
 
 // Gemeldeten Status aktualisieren (von ESP32)
@@ -107,17 +122,155 @@ const checkAndUpdateAutoMode = async (status) => {
     // Status nur ändern, wenn nötig
     if (newDesiredState !== status.desired_state) {
       console.log(`✅ Status-Änderung: ${currentDesiredState.toUpperCase()} → ${newDesiredState.toUpperCase()}`);
+      const oldState = status.desired_state;
       status = await PlugControl.setDesiredState(newDesiredState);
       status.mode = 'auto';
       status.temperature_threshold = threshold;
+      
+      // Zyklus-Erkennung bei Status-Änderung
+      await handleStateChange(oldState, newDesiredState, status, currentTemp);
     } else {
       console.log(`⏭️ Keine Änderung nötig (bleibt ${currentDesiredState.toUpperCase()})`);
+      
+      // Prüfe ob laufender Zyklus beendet werden kann
+      await checkActiveCycles(status, currentTemp);
     }
     
     return status;
   } catch (error) {
     console.error('❌ Fehler in Automatik-Logik:', error);
     return status;
+  }
+};
+
+// Zyklus-Erkennung: Status-Änderung verarbeiten
+const handleStateChange = async (oldState, newState, status, currentTemp = null) => {
+  try {
+    // Hole aktuelle Temperatur falls nicht übergeben
+    if (currentTemp === null) {
+      const latestSensor = await SensorMesswert.getLatest();
+      currentTemp = latestSensor?.temperatur || null;
+    }
+    
+    if (currentTemp === null) {
+      console.log('⚠️ Keine Temperaturdaten für Zyklus-Erkennung verfügbar');
+      return;
+    }
+    
+    const threshold = status.temperature_threshold;
+    const hysteresis = status.hysteresis || 0.5;
+    const now = new Date();
+    
+    // Heizzyklus starten: 'off' → 'on'
+    if (oldState === 'off' && newState === 'on') {
+      // Beende eventuell laufenden Abkühlzyklus (sollte nicht passieren, aber sicherheitshalber)
+      if (activeCycles.cooling) {
+        console.log('⚠️ Abkühlzyklus wurde durch Heizzyklus-Start unterbrochen');
+        activeCycles.cooling = null;
+      }
+      
+      activeCycles.heating = {
+        startTime: now,
+        startTemperature: currentTemp,
+        threshold: threshold,
+        hysteresis: hysteresis,
+        mode: status.mode
+      };
+      console.log(`🔥 Heizzyklus gestartet: ${currentTemp}°C → Ziel: ${threshold}°C`);
+    }
+    
+    // Abkühlzyklus starten: 'on' → 'off'
+    if (oldState === 'on' && newState === 'off') {
+      // Beende eventuell laufenden Heizzyklus
+      if (activeCycles.heating) {
+        const cycle = activeCycles.heating;
+        const endTemp = currentTemp;
+        
+        // Prüfe ob Zieltemperatur erreicht wurde
+        if (endTemp >= cycle.threshold) {
+          await temperatureCycleService.saveCycle(
+            'heating',
+            cycle.startTime,
+            now,
+            cycle.startTemperature,
+            endTemp,
+            cycle.threshold,
+            cycle.hysteresis,
+            cycle.mode
+          );
+          console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${endTemp}°C`);
+        } else {
+          console.log(`⚠️ Heizzyklus unterbrochen (Ziel nicht erreicht): ${cycle.startTemperature}°C → ${endTemp}°C`);
+        }
+        activeCycles.heating = null;
+      }
+      
+      // Start-Temperatur für Abkühlzyklus ist threshold + hysteresis (wo die Heizung ausgeschaltet wurde)
+      const coolingStartTemp = threshold + hysteresis;
+      activeCycles.cooling = {
+        startTime: now,
+        startTemperature: coolingStartTemp,
+        threshold: threshold,
+        hysteresis: hysteresis,
+        mode: status.mode
+      };
+      console.log(`❄️ Abkühlzyklus gestartet: ${coolingStartTemp}°C → Ziel: ${threshold}°C`);
+    }
+  } catch (error) {
+    console.error('❌ Fehler bei Zyklus-Erkennung:', error);
+  }
+};
+
+// Prüfe ob laufende Zyklen beendet werden können
+const checkActiveCycles = async (status, currentTemp) => {
+  try {
+    const threshold = status.temperature_threshold;
+    const hysteresis = status.hysteresis || 0.5;
+    const now = new Date();
+    
+    // Prüfe Heizzyklus
+    if (activeCycles.heating) {
+      const cycle = activeCycles.heating;
+      
+      // Heizzyklus ist beendet wenn Temperatur >= threshold
+      if (currentTemp >= cycle.threshold) {
+        await temperatureCycleService.saveCycle(
+          'heating',
+          cycle.startTime,
+          now,
+          cycle.startTemperature,
+          currentTemp,
+          cycle.threshold,
+          cycle.hysteresis,
+          cycle.mode
+        );
+        console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${currentTemp}°C`);
+        activeCycles.heating = null;
+      }
+    }
+    
+    // Prüfe Abkühlzyklus
+    if (activeCycles.cooling) {
+      const cycle = activeCycles.cooling;
+      
+      // Abkühlzyklus ist beendet wenn Temperatur <= threshold
+      if (currentTemp <= cycle.threshold) {
+        await temperatureCycleService.saveCycle(
+          'cooling',
+          cycle.startTime,
+          now,
+          cycle.startTemperature,
+          currentTemp,
+          cycle.threshold,
+          cycle.hysteresis,
+          cycle.mode
+        );
+        console.log(`✅ Abkühlzyklus abgeschlossen: ${cycle.startTemperature}°C → ${currentTemp}°C`);
+        activeCycles.cooling = null;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Fehler beim Prüfen aktiver Zyklen:', error);
   }
 };
 
