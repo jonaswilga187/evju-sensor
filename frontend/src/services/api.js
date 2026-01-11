@@ -323,5 +323,83 @@ export const weatherAPI = {
   },
 };
 
+/**
+ * Temperature Cycle API Service
+ * API-Aufrufe für Temperatur-Zyklus-Dokumentation
+ */
+export const temperatureCycleAPI = {
+  /**
+   * Zyklen abrufen mit Filtern
+   * @param {Date|string} startDate - Start-Datum
+   * @param {Date|string} endDate - End-Datum
+   * @param {string} cycleType - Optional: 'heating' oder 'cooling'
+   * @returns {Promise<Array>} Array mit Zyklen
+   */
+  async getCycles(startDate, endDate, cycleType = null) {
+    try {
+      const start = startDate instanceof Date ? startDate.toISOString().split('T')[0] : startDate;
+      const end = endDate instanceof Date ? endDate.toISOString().split('T')[0] : endDate;
+      
+      let url = `${API_BASE_URL}/cycles?startDate=${start}&endDate=${end}`;
+      if (cycleType) {
+        url += `&cycleType=${cycleType}`;
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Zyklen:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Tagesstatistiken abrufen
+   * @param {Date|string} startDate - Start-Datum
+   * @param {Date|string} endDate - End-Datum
+   * @returns {Promise<Array>} Array mit Tagesstatistiken
+   */
+  async getDailyStatistics(startDate, endDate) {
+    try {
+      const start = startDate instanceof Date ? startDate.toISOString().split('T')[0] : startDate;
+      const end = endDate instanceof Date ? endDate.toISOString().split('T')[0] : endDate;
+      
+      const response = await fetch(`${API_BASE_URL}/cycles/daily?startDate=${start}&endDate=${end}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Tagesstatistiken:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Zyklen für einen bestimmten Tag abrufen
+   * @param {string} date - Datum im Format YYYY-MM-DD
+   * @returns {Promise<Array>} Array mit Zyklen des Tages
+   */
+  async getCyclesByDate(date) {
+    try {
+      const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+      const response = await fetch(`${API_BASE_URL}/cycles/${dateStr}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Tageszyklen:', error);
+      throw error;
+    }
+  },
+};
+
 export default sensorAPI;
 
