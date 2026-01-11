@@ -248,6 +248,7 @@ function App() {
             </h2>
             <ResponsiveContainer width="100%" height={350}>
               <LineChart
+                key={data.length > 0 ? 'loaded' : 'loading'}
                 data={data}
                 margin={{ top: 10, right: 60, left: 0, bottom: 0 }}
               >
@@ -281,11 +282,15 @@ function App() {
                   type="monotone"
                   dataKey="temperatur"
                   stroke="#f97316"
-                  strokeWidth={3}
+                  strokeWidth={2}
+                  strokeLinecap="butt"
                   dot={{ fill: '#f97316', r: 4 }}
-                  activeDot={{ r: 6 }}
+                  activeDot={false}
                   name="temperatur"
                   yAxisId="left"
+                  isAnimationActive={false}
+                  animationDuration={0}
+                  animationBegin={0}
                 />
                 <Line
                   type="monotone"
