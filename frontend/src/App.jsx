@@ -392,7 +392,6 @@ function App() {
                   dataKey="außentemperatur"
                   stroke="#6b7280"
                   strokeWidth={1.5}
-                  strokeDasharray="5 5"
                   dot={{ fill: '#6b7280', r: 2 }}
                   name="außentemperatur"
                   yAxisId="left"
