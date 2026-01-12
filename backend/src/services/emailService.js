@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // E-Mail-Transporter konfigurieren
-const createTransporter = () => {
+const createTransport = () => {
   // Für Gmail (empfohlen für einfache Einrichtung)
   if (process.env.EMAIL_SERVICE === 'gmail') {
     return nodemailer.createTransport({
@@ -17,7 +17,7 @@ const createTransporter = () => {
   }
 
   // Für andere SMTP-Server (z.B. Outlook, eigene Mail-Server)
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true', // true für 465, false für andere Ports
@@ -41,7 +41,7 @@ export const sendVerbrauchAlarm = async (kwhVerbrauch, schwellenwert = 12) => {
       return false;
     }
 
-    const transporter = createTransporter();
+    const transporter = createTransport();
 
     const mailOptions = {
       from: `"Energie-Monitoring" <${process.env.EMAIL_USER}>`,
@@ -133,7 +133,7 @@ export const testEmailConfig = async () => {
       };
     }
 
-    const transporter = createTransporter();
+    const transporter = createTransport();
     await transporter.verify();
 
     return {
