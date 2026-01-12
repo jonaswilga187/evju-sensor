@@ -54,3 +54,4 @@ export const resetAlarmStatus = () => {
   console.log('🔄 Alarm-Status zurückgesetzt');
 };
 
+

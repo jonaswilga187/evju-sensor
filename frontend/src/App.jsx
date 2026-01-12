@@ -391,9 +391,14 @@ function App() {
                   type="monotone"
                   dataKey="außentemperatur"
                   stroke="#6b7280"
+<<<<<<< Updated upstream
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={{ fill: '#6b7280', r: 3 }}
+=======
+                  strokeWidth={1.5}
+                  dot={{ fill: '#6b7280', r: 2 }}
+>>>>>>> Stashed changes
                   name="außentemperatur"
                   yAxisId="left"
                   connectNulls={true}
