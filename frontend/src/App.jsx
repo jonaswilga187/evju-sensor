@@ -99,29 +99,59 @@ function App() {
             kwhAkkumulator += (avgWatt / 1000) * hoursDiff
           }
           
-          // Außentemperatur für diesen Zeitpunkt finden
+          // Außentemperatur für diesen Zeitpunkt finden (passend zu DB-Timestamps)
           let außentemperatur = null
           if (weatherData && weatherData.length > 0) {
             const sensorTime = new Date(item.zeitstempel)
-            // Finde den nächsten Wetterdaten-Punkt (innerhalb von 1 Stunde)
-            const matchingWeather = weatherData.find(w => {
+            
+            // Sortiere Wetterdaten nach Zeit
+            const sortedWeather = [...weatherData].sort((a, b) => 
+              new Date(a.time) - new Date(b.time)
+            )
+            
+            // Finde exakten Match oder nächste Punkte für Interpolation
+            const exactMatch = sortedWeather.find(w => {
               const weatherTime = new Date(w.time)
-              const diffMinutes = Math.abs((sensorTime - weatherTime) / (1000 * 60))
-              return diffMinutes <= 60 // Maximal 60 Minuten Unterschied
+              return Math.abs(sensorTime - weatherTime) < 1000 // Exakt gleich (1 Sekunde Toleranz)
             })
             
-            if (matchingWeather) {
-              außentemperatur = matchingWeather.temperature
+            if (exactMatch) {
+              außentemperatur = exactMatch.temperature
             } else {
-              // Fallback: Nächster verfügbarer Wert (ohne Interpolation für bessere Performance)
-              const sortedWeather = [...weatherData].sort((a, b) => 
-                Math.abs(new Date(a.time) - sensorTime) - Math.abs(new Date(b.time) - sensorTime)
-              )
-              if (sortedWeather.length > 0) {
-                const closest = sortedWeather[0]
-                const diffHours = Math.abs((new Date(closest.time) - sensorTime) / (1000 * 60 * 60))
-                if (diffHours <= 2) { // Maximal 2 Stunden Unterschied
-                  außentemperatur = closest.temperature
+              // Finde die beiden nächsten Punkte für lineare Interpolation
+              let before = null
+              let after = null
+              
+              for (let i = 0; i < sortedWeather.length; i++) {
+                const weatherTime = new Date(sortedWeather[i].time)
+                if (weatherTime <= sensorTime) {
+                  before = sortedWeather[i]
+                } else if (weatherTime > sensorTime && !after) {
+                  after = sortedWeather[i]
+                  break
+                }
+              }
+              
+              // Interpolation wenn beide Punkte vorhanden
+              if (before && after) {
+                const beforeTime = new Date(before.time).getTime()
+                const afterTime = new Date(after.time).getTime()
+                const sensorTimeMs = sensorTime.getTime()
+                
+                // Lineare Interpolation
+                const ratio = (sensorTimeMs - beforeTime) / (afterTime - beforeTime)
+                außentemperatur = before.temperature + (after.temperature - before.temperature) * ratio
+              } else if (before) {
+                // Nur Punkt davor vorhanden (maximal 2 Stunden Unterschied)
+                const diffHours = Math.abs((sensorTime - new Date(before.time)) / (1000 * 60 * 60))
+                if (diffHours <= 2) {
+                  außentemperatur = before.temperature
+                }
+              } else if (after) {
+                // Nur Punkt danach vorhanden (maximal 2 Stunden Unterschied)
+                const diffHours = Math.abs((new Date(after.time) - sensorTime) / (1000 * 60 * 60))
+                if (diffHours <= 2) {
+                  außentemperatur = after.temperature
                 }
               }
             }
@@ -362,6 +392,7 @@ function App() {
                   dataKey="außentemperatur"
                   stroke="#6b7280"
                   strokeWidth={2}
+                  strokeDasharray="5 5"
                   dot={{ fill: '#6b7280', r: 3 }}
                   name="außentemperatur"
                   yAxisId="left"

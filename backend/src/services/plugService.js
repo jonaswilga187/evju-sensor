@@ -185,20 +185,21 @@ const handleStateChange = async (oldState, newState, status, currentTemp = null)
       if (activeCycles.heating) {
         const cycle = activeCycles.heating;
         const endTemp = currentTemp;
+        const targetTemp = cycle.threshold + cycle.hysteresis;
         
-        // Prüfe ob Zieltemperatur erreicht wurde
-        if (endTemp >= cycle.threshold) {
+        // Prüfe ob Zieltemperatur erreicht wurde (Schwelle + Hysterese)
+        if (endTemp >= targetTemp) {
           await temperatureCycleService.saveCycle(
             'heating',
             cycle.startTime,
             now,
             cycle.startTemperature,
-            endTemp,
+            targetTemp,
             cycle.threshold,
             cycle.hysteresis,
             cycle.mode
           );
-          console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${endTemp}°C`);
+          console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${targetTemp}°C`);
         } else {
           console.log(`⚠️ Heizzyklus unterbrochen (Ziel nicht erreicht): ${cycle.startTemperature}°C → ${endTemp}°C`);
         }
@@ -231,20 +232,21 @@ const checkActiveCycles = async (status, currentTemp) => {
     // Prüfe Heizzyklus
     if (activeCycles.heating) {
       const cycle = activeCycles.heating;
+      const targetTemp = cycle.threshold + cycle.hysteresis;
       
-      // Heizzyklus ist beendet wenn Temperatur >= threshold
-      if (currentTemp >= cycle.threshold) {
+      // Heizzyklus ist beendet wenn Temperatur >= threshold + hysteresis
+      if (currentTemp >= targetTemp) {
         await temperatureCycleService.saveCycle(
           'heating',
           cycle.startTime,
           now,
           cycle.startTemperature,
-          currentTemp,
+          targetTemp,
           cycle.threshold,
           cycle.hysteresis,
           cycle.mode
         );
-        console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${currentTemp}°C`);
+        console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${targetTemp}°C`);
         activeCycles.heating = null;
       }
     }
