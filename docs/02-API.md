@@ -203,9 +203,13 @@ GET /api/sensors/stats
 ```
 
 #### 7. Neuen Messwert erstellen
+
+⚠️ Erfordert einen gültigen API-Key (siehe [Authentifizierung](#-authentifizierung)).
+
 ```http
 POST /api/sensors
 Content-Type: application/json
+X-API-Key: dein-api-key
 
 {
   "temperatur": 22.5,
@@ -225,9 +229,13 @@ Content-Type: application/json
 ```
 
 #### 8. Mehrere Messwerte erstellen (Bulk)
+
+⚠️ Erfordert einen gültigen API-Key.
+
 ```http
 POST /api/sensors/bulk
 Content-Type: application/json
+X-API-Key: dein-api-key
 
 {
   "messwerte": [
@@ -279,8 +287,29 @@ GET /health
 - ✅ Helmet.js - Security Headers
 - ✅ CORS - Cross-Origin Resource Sharing
 - ✅ Rate Limiting - DDoS Schutz
+- ✅ API-Key-Authentifizierung - Schutz der Schreib-Endpunkte
 - ✅ Input Validation - Mongoose Validators
 - ✅ Error Handling - Zentrale Fehlerbehandlung
+
+## 🔑 Authentifizierung
+
+Alle **schreibenden** Endpunkte (`POST /api/sensors`, `POST /api/sensors/bulk`,
+`PUT /api/plug/desired`, `PUT /api/plug/mode`, `POST /api/plug/reported`) erfordern
+den Header `X-API-Key` mit dem Wert der `API_KEY` Umgebungsvariable des Backends.
+Lesende GET-Endpunkte bleiben öffentlich, da sie nur Monitoring-Daten liefern.
+
+Fehlt der Key oder ist er falsch, antwortet die API mit `401 Unauthorized`.
+Ist `API_KEY` in der Umgebung gar nicht gesetzt, verweigert das Backend im
+Production-Modus (`NODE_ENV=production`) den Start der geschützten Routen
+(`503`); im Development-Modus bleiben sie zur Vereinfachung offen (mit Warnung
+im Log).
+
+```bash
+curl -X POST http://localhost:5000/api/sensors \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dein-api-key" \
+  -d '{"temperatur":22.5,"luftfeuchtigkeit":65,"stromverbrauch":450}'
+```
 
 ## 🧪 Testing mit cURL
 
@@ -294,9 +323,10 @@ curl http://localhost:5000/api/sensors/24h
 # Averages
 curl http://localhost:5000/api/sensors/averages
 
-# Create Messwert
+# Create Messwert (benötigt API-Key, siehe oben)
 curl -X POST http://localhost:5000/api/sensors \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: dein-api-key" \
   -d '{"temperatur":22.5,"luftfeuchtigkeit":65,"stromverbrauch":450}'
 ```
 
@@ -336,8 +366,11 @@ export const sensorAPI = {
 Das Projekt enthält ein vollständiges Docker Setup mit MongoDB und Nginx Proxy Manager.
 
 ```bash
-# .env Datei erstellen (aus ENV_TEMPLATE.txt)
-cp ENV_TEMPLATE.txt .env
+# docker-compose.yml aus der Vorlage erstellen
+cp ../docker-compose.example.yml ../docker-compose.yml
+
+# .env Datei erstellen
+cp ../.env.example ../.env
 # Bearbeite .env und passe die Werte an!
 
 # Alle Services starten
@@ -350,7 +383,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-**Siehe [DOCKER_README.md](../DOCKER_README.md) für Details!**
+**Siehe [04-DOCKER.md](04-DOCKER.md) für Details!**
 
 ### Mit Docker (nur Backend)
 

@@ -47,9 +47,12 @@ GET /api/plug/status
 
 ### 2. Gewünschten Status setzen (von Website)
 
+⚠️ Erfordert einen gültigen API-Key (siehe [02-API.md](02-API.md#-authentifizierung)).
+
 ```http
 PUT /api/plug/desired
 Content-Type: application/json
+X-API-Key: dein-api-key
 
 {
   "state": "on"  // "on" oder "off"
@@ -87,9 +90,12 @@ GET /api/plug/desired
 
 ### 4. Aktuellen Status melden (von ESP32)
 
+⚠️ Erfordert einen gültigen API-Key.
+
 ```http
 POST /api/plug/reported
 Content-Type: application/json
+X-API-Key: dein-api-key
 
 {
   "state": "on"  // "on", "off" oder "unknown"
@@ -302,24 +308,29 @@ Anzeige:
 
 ## Sicherheit
 
-⚠️ **Wichtig:** Dieses System ist für lokale Netzwerke gedacht!
+Alle Endpunkte, die den Heizungs-Status ändern oder Sensordaten einspielen
+(`PUT /api/plug/desired`, `PUT /api/plug/mode`, `POST /api/plug/reported`,
+`POST /api/sensors`, `POST /api/sensors/bulk`), sind über einen gemeinsamen
+API-Key geschützt (`X-API-Key` Header, siehe `API_KEY` in `.env.example` und
+[02-API.md](02-API.md#-authentifizierung)). Ohne gültigen Key antwortet die
+API mit `401 Unauthorized`.
 
-### Empfehlungen:
+### Weitere Empfehlungen:
 
 1. **Firewall-Regeln**
-   - Nur LAN-Zugriff auf API
-   - Kein direkter Internet-Zugriff
+   - Nur notwendige Ports öffentlich erreichbar machen
+   - ESP32-Geräte idealerweise nur im LAN, nicht direkt aus dem Internet
 
-2. **Authentifizierung** (optional erweitern)
-   - API-Keys für ESP32
-   - JWT für Frontend
-
-3. **HTTPS verwenden**
-   - Für Produktivumgebung
+2. **HTTPS verwenden**
+   - Für Produktivumgebung zwingend (der API-Key wird sonst im Klartext übertragen)
    - Siehe SSL-Dokumentation
 
-4. **Rate Limiting**
+3. **Rate Limiting**
    - Bereits implementiert in `rateLimiter.js`
+
+4. **API-Key rotieren**
+   - Bei Verdacht auf Kompromittierung `API_KEY` in `.env` ändern und alle
+     ESP32-Geräte sowie das Dashboard mit dem neuen Key aktualisieren
 
 ## Debugging
 
@@ -355,10 +366,10 @@ fetch('http://localhost:5000/api/plug/status')
   .then(r => r.json())
   .then(console.log)
 
-// Status setzen
+// Status setzen (benötigt API-Key)
 fetch('http://localhost:5000/api/plug/desired', {
   method: 'PUT',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'X-API-Key': 'dein-api-key' },
   body: JSON.stringify({ state: 'on' })
 }).then(r => r.json()).then(console.log)
 ```

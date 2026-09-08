@@ -21,6 +21,10 @@ const char* password = "DEIN_WIFI_PASSWORT";
 const char* apiUrl = "http://192.168.1.100:5000/api/sensors";  // Deine API URL
 // const char* apiUrl = "https://api.yourdomain.com/api/sensors";  // Production
 
+// API-Key für POST /api/sensors (muss mit der API_KEY Umgebungsvariable
+// des Backends übereinstimmen!)
+const char* apiKey = "DEIN_API_KEY";
+
 // Sensor Konfiguration
 // #define DHTPIN 4
 // #define DHTTYPE DHT22
@@ -147,7 +151,8 @@ void sendToAPI(float temperatur, float luftfeuchtigkeit, int stromverbrauch) {
   
   http.begin(apiUrl);
   http.addHeader("Content-Type", "application/json");
-  
+  http.addHeader("X-API-Key", apiKey);
+
   // JSON Payload erstellen
   StaticJsonDocument<200> doc;
   doc["temperatur"] = temperatur;

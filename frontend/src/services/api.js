@@ -9,6 +9,41 @@ if (!API_BASE_URL) {
   console.error('❌ VITE_API_URL ist nicht gesetzt! Bitte .env prüfen.');
 }
 
+// API-Key für geschützte Endpunkte (Heizungssteuerung)
+// Wird lokal im Browser gespeichert, damit man ihn nicht bei jeder Aktion neu eingeben muss.
+const API_KEY_STORAGE_KEY = 'sensor_dashboard_api_key';
+
+export const getApiKey = () => localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+export const setApiKey = (key) => localStorage.setItem(API_KEY_STORAGE_KEY, key);
+
+/**
+ * Führt einen fetch-Request mit API-Key-Header aus. Schlägt der Request mit
+ * 401 fehl (fehlender/falscher Key), wird der Nutzer einmalig zur Eingabe
+ * aufgefordert und der Request wiederholt.
+ */
+async function authorizedFetch(url, options = {}) {
+  const doFetch = () =>
+    fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'X-API-Key': getApiKey(),
+      },
+    });
+
+  let response = await doFetch();
+
+  if (response.status === 401) {
+    const key = window.prompt('API-Key erforderlich, um die Heizung zu steuern:');
+    if (key) {
+      setApiKey(key);
+      response = await doFetch();
+    }
+  }
+
+  return response;
+}
+
 /**
  * Sensor API Service
  * Alle API-Aufrufe für das Sensor Monitoring Dashboard
@@ -231,7 +266,7 @@ export const plugAPI = {
    */
   async setDesiredState(state) {
     try {
-      const response = await fetch(`${API_BASE_URL}/plug/desired`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/plug/desired`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -266,7 +301,7 @@ export const plugAPI = {
         body.hysteresis = hysteresis;
       }
       
-      const response = await fetch(`${API_BASE_URL}/plug/mode`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/plug/mode`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

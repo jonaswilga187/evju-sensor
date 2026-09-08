@@ -33,6 +33,10 @@ const char* WIFI_PASSWORD = "DeinPasswort";
 // API Server
 const char* API_URL = "http://dein-server.de/api";  // OHNE / am Ende!
 
+// API-Key für geschützte Endpunkte (POST /sensors, POST /plug/reported)
+// Muss mit der API_KEY Umgebungsvariable des Backends übereinstimmen!
+const char* API_KEY = "DEIN_API_KEY";
+
 // Shelly Plug IP
 const char* SHELLY_IP = "192.168.1.100";  // IP deines Shelly Plug
 
@@ -178,7 +182,8 @@ void sendDataToAPI(float temp, float hum, float power) {
   String url = String(API_URL) + "/sensors";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
-  
+  http.addHeader("X-API-Key", API_KEY);
+
   // JSON erstellen
   DynamicJsonDocument doc(256);
   doc["temperatur"] = temp;
@@ -293,7 +298,8 @@ void reportStateToAPI(String state) {
   String url = String(API_URL) + "/plug/reported";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
-  
+  http.addHeader("X-API-Key", API_KEY);
+
   DynamicJsonDocument doc(128);
   doc["state"] = state;
   

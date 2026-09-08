@@ -110,7 +110,7 @@ rsync -avz --exclude 'node_modules' --exclude '.git' \
 cd /home/$USER/sensor-monitoring
 
 # .env erstellen
-cp ENV_TEMPLATE.txt .env
+cp .env.example .env
 
 # Mit nano bearbeiten
 nano .env

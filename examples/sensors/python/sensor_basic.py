@@ -13,6 +13,10 @@ from datetime import datetime
 API_URL = "http://localhost:5000/api/sensors"  # Oder: https://api.yourdomain.com/api/sensors
 API_TIMEOUT = 10  # Sekunden
 
+# API-Key für POST /api/sensors (muss mit der API_KEY Umgebungsvariable
+# des Backends übereinstimmen!)
+API_KEY = "DEIN_API_KEY"
+
 # Intervall (in Sekunden)
 INTERVAL = 300  # 5 Minuten = 300 Sekunden
 
@@ -63,7 +67,7 @@ def send_to_api(temperatur, luftfeuchtigkeit, stromverbrauch):
             API_URL,
             json=data,
             timeout=API_TIMEOUT,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json", "X-API-Key": API_KEY}
         )
         
         if response.status_code == 201:

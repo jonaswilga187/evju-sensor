@@ -343,7 +343,7 @@ docker compose up -d --build
 Nach erfolgreicher Installation:
 
 1. 📖 [API Dokumentation](02-API.md) lesen
-2. 🌡️ [Sensoren einrichten](05-SENSORS.md)
+2. 🌡️ [Sensoren & Heizungssteuerung einrichten](05-PLUG-CONTROL.md)
 3. 🚀 [Deployment vorbereiten](03-DEPLOYMENT.md)
 
 ## 💡 Tipps
