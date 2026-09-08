@@ -17,7 +17,7 @@ const plugStateLogSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['manual', 'auto'],
+    enum: ['manual', 'auto', 'experiment'],
     required: true
   },
   timestamp: {

@@ -117,19 +117,35 @@ export const getDataByRange = async (req, res, next) => {
 // POST /api/sensors - Neuen Messwert erstellen
 export const createMesswert = async (req, res, next) => {
   try {
-    const { temperatur, luftfeuchtigkeit, stromverbrauch, zeitstempel } = req.body;
+    const {
+      temperatur,
+      luftfeuchtigkeit,
+      stromverbrauch,
+      stromverbrauch_heizung,
+      stromverbrauch_entfeuchter,
+      zeitstempel
+    } = req.body;
 
-    if (temperatur === undefined || luftfeuchtigkeit === undefined || stromverbrauch === undefined) {
+    // stromverbrauch bleibt Pflichtfeld für Abwärtskompatibilität, kann aber
+    // auch aus den beiden Einzelwerten berechnet werden, wenn der ESP32
+    // (noch) nur die Einzelwerte schickt statt der Summe.
+    const gesamtStromverbrauch = stromverbrauch !== undefined
+      ? stromverbrauch
+      : (stromverbrauch_heizung || 0) + (stromverbrauch_entfeuchter || 0);
+
+    if (temperatur === undefined || luftfeuchtigkeit === undefined || gesamtStromverbrauch === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Temperatur, Luftfeuchtigkeit und Stromverbrauch sind erforderlich'
+        message: 'Temperatur, Luftfeuchtigkeit und Stromverbrauch (gesamt oder pro Gerät) sind erforderlich'
       });
     }
 
     const data = await sensorService.createMesswert({
       temperatur,
       luftfeuchtigkeit,
-      stromverbrauch,
+      stromverbrauch: gesamtStromverbrauch,
+      stromverbrauch_heizung: stromverbrauch_heizung ?? null,
+      stromverbrauch_entfeuchter: stromverbrauch_entfeuchter ?? null,
       zeitstempel: zeitstempel ? new Date(zeitstempel) : new Date()
     });
 

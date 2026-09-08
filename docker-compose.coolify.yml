@@ -61,6 +61,10 @@ services:
       args:
         VITE_API_URL: 'https://sensor-api.wilga.tech/api'
     restart: unless-stopped
+    environment:
+      # Basic-Auth vor dem Dashboard (siehe frontend/docker-entrypoint.sh)
+      DASHBOARD_USERNAME: '${DASHBOARD_USERNAME}'
+      DASHBOARD_PASSWORD: '${DASHBOARD_PASSWORD}'
     depends_on:
       - backend
 

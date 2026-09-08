@@ -18,10 +18,27 @@ const messwertSchema = new mongoose.Schema({
     min: [0, 'Luftfeuchtigkeit muss mindestens 0% sein'],
     max: [100, 'Luftfeuchtigkeit darf maximal 100% sein']
   },
+  // Gesamt-Stromverbrauch (Summe aller Plugs). Bleibt required für
+  // Abwärtskompatibilität mit bestehenden Auswertungen (Durchschnitte,
+  // Alarme, Verbrauchsanalyse) - wird vom Backend automatisch aus den
+  // beiden Einzelwerten berechnet, falls nicht separat übergeben.
   stromverbrauch: {
     type: Number,
     required: [true, 'Stromverbrauch ist erforderlich'],
     min: [0, 'Stromverbrauch muss positiv sein']
+  },
+  // Einzelverbrauch pro Plug, optional (ältere Messwerte oder andere
+  // Sensor-Quellen haben das ggf. nicht). Für den Verbrauchs-Chart im
+  // Frontend, das Heizung und Entfeuchter getrennt anzeigt.
+  stromverbrauch_heizung: {
+    type: Number,
+    min: [0, 'Stromverbrauch muss positiv sein'],
+    default: null
+  },
+  stromverbrauch_entfeuchter: {
+    type: Number,
+    min: [0, 'Stromverbrauch muss positiv sein'],
+    default: null
   },
   meta: {
     standort: {
@@ -51,7 +68,7 @@ messwertSchema.statics.getLast24Hours = function() {
   return this.find({
     zeitstempel: { $gte: last24h }
   })
-  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch -_id')
+  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch stromverbrauch_heizung stromverbrauch_entfeuchter -_id')
   .sort({ zeitstempel: 1 })
   .lean();
 };
@@ -137,7 +154,7 @@ messwertSchema.statics.getHourlyData = function(hours = 24) {
 messwertSchema.statics.getLatest = function() {
   return this.findOne()
     .sort({ zeitstempel: -1 })
-    .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch -_id')
+    .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch stromverbrauch_heizung stromverbrauch_entfeuchter -_id')
     .lean();
 };
 

@@ -6,6 +6,7 @@ import DayComparison from './DayComparison'
 import TemperatureCycles from './TemperatureCycles'
 import ApiKeySettings from './ApiKeySettings'
 import ConsumptionAnalysis from './ConsumptionAnalysis'
+import ExperimentControl from './ExperimentControl'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
@@ -31,12 +32,16 @@ const CustomTooltip = ({ active, payload }) => {
       if (name === 'außentemperatur') return '°C'
       if (name === 'feuchtigkeit') return '%'
       if (name === 'stromverbrauch') return 'W'
+      if (name === 'stromverbrauch_heizung') return 'W'
+      if (name === 'stromverbrauch_entfeuchter') return 'W'
       if (name === 'kwh_kumulativ') return 'kWh'
       return ''
     }
 
     const getLabel = (name) => {
       if (name === 'außentemperatur') return 'Außentemperatur'
+      if (name === 'stromverbrauch_heizung') return 'Heizung'
+      if (name === 'stromverbrauch_entfeuchter') return 'Entfeuchter'
       return name.charAt(0).toUpperCase() + name.slice(1)
     }
 
@@ -51,7 +56,7 @@ const CustomTooltip = ({ active, payload }) => {
             />
             <span className="text-sm text-gray-600">{getLabel(entry.name)}:</span>
             <span className="text-sm font-semibold text-gray-800">
-              {entry.value?.toFixed(1)}{getUnit(entry.name)}
+              {typeof entry.value === 'number' ? entry.value.toFixed(1) : 'n/a'}{getUnit(entry.name)}
             </span>
           </div>
         ))}
@@ -103,13 +108,18 @@ function App() {
           }
           
           return {
-            zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
+            zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', {
+              hour: '2-digit',
+              minute: '2-digit'
             }),
             temperatur: item.temperatur,
             feuchtigkeit: item.luftfeuchtigkeit,
             stromverbrauch: item.stromverbrauch,
+            // Einzelverbrauch pro Gerät - kann bei älteren Messwerten (vor der
+            // Aufteilung) fehlen, dann null statt 0, damit die Linie im Chart
+            // ehrlich eine Lücke zeigt statt einen falschen Nullwert.
+            stromverbrauch_heizung: item.stromverbrauch_heizung ?? null,
+            stromverbrauch_entfeuchter: item.stromverbrauch_entfeuchter ?? null,
             kwh_kumulativ: parseFloat(kwhAkkumulator.toFixed(2))
           }
         })
@@ -399,9 +409,13 @@ function App() {
                 margin={{ top: 10, right: 60, left: 0, bottom: 0 }}
               >
                 <defs>
-                  <linearGradient id="colorStromverbrauch" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                  <linearGradient id="colorStromHeizung" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.7}/>
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0.05}/>
+                  </linearGradient>
+                  <linearGradient id="colorStromEntfeuchter" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.7}/>
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.05}/>
                   </linearGradient>
                   <linearGradient id="colorKWh" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
@@ -436,13 +450,25 @@ function App() {
                 />
                 <Area
                   type="monotone"
-                  dataKey="stromverbrauch"
-                  stroke="#10b981"
-                  strokeWidth={3}
+                  dataKey="stromverbrauch_heizung"
+                  stroke="#f97316"
+                  strokeWidth={2.5}
                   fillOpacity={1}
-                  fill="url(#colorStromverbrauch)"
-                  name="stromverbrauch"
+                  fill="url(#colorStromHeizung)"
+                  name="stromverbrauch_heizung"
                   yAxisId="left"
+                  connectNulls
+                />
+                <Area
+                  type="monotone"
+                  dataKey="stromverbrauch_entfeuchter"
+                  stroke="#06b6d4"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#colorStromEntfeuchter)"
+                  name="stromverbrauch_entfeuchter"
+                  yAxisId="left"
+                  connectNulls
                 />
                 <Area
                   type="monotone"
@@ -460,6 +486,9 @@ function App() {
 
           {/* API-Key für Schreibzugriffe (Heizung/Entfeuchter schalten) */}
           <ApiKeySettings />
+
+          {/* Testwoche: automatisierte Experiment-Sequenz für die Verbrauchsanalyse */}
+          <ExperimentControl />
 
           {/* Heizung & Entfeuchter Steuerung */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">

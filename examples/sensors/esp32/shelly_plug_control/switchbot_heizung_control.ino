@@ -204,7 +204,7 @@ void readAndSendSensorData() {
   Serial.printf("⚡ Stromverbrauch gesamt: %.1f W (Heizung: %.1fW, Entfeuchter: %.1fW)\n",
                 stromverbrauch, stromHeizung, stromEntfeuchter);
 
-  sendDataToAPI(temperatur, luftfeuchtigkeit, stromverbrauch);
+  sendDataToAPI(temperatur, luftfeuchtigkeit, stromverbrauch, stromHeizung, stromEntfeuchter);
 }
 
 float readTemperature() {
@@ -225,7 +225,8 @@ float readHumidity() {
   return hum;
 }
 
-void sendDataToAPI(float temperatur, float luftfeuchtigkeit, float stromverbrauch) {
+void sendDataToAPI(float temperatur, float luftfeuchtigkeit, float stromverbrauch,
+                    float stromHeizung, float stromEntfeuchter) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("❌ Keine WiFi Verbindung");
     return;
@@ -240,6 +241,8 @@ void sendDataToAPI(float temperatur, float luftfeuchtigkeit, float stromverbrauc
   doc["temperatur"] = temperatur;
   doc["luftfeuchtigkeit"] = luftfeuchtigkeit;
   doc["stromverbrauch"] = stromverbrauch;
+  doc["stromverbrauch_heizung"] = stromHeizung;
+  doc["stromverbrauch_entfeuchter"] = stromEntfeuchter;
 
   String jsonString;
   serializeJson(doc, jsonString);

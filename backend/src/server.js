@@ -9,6 +9,7 @@ import { rateLimiter } from './middleware/rateLimiter.js';
 import routes from './routes/index.js';
 import { checkVerbrauchAlarm } from './services/verbrauchAlarmService.js';
 import { initPlugs } from './services/plugService.js';
+import { advanceIfNeeded as advanceExperimentIfNeeded } from './services/experimentService.js';
 
 // Umgebungsvariablen laden
 dotenv.config();
@@ -75,6 +76,12 @@ app.listen(PORT, () => {
   setInterval(() => {
     checkVerbrauchAlarm();
   }, checkIntervalMs);
+
+  // Experiment-Phasen-Fortschritt prüfen (Testwoche, siehe experimentService.js)
+  // - kurzes Intervall, damit auch 1-Minuten-Phasen zeitnah geschaltet werden
+  setInterval(() => {
+    advanceExperimentIfNeeded().catch((err) => console.error('❌ Fehler im Experiment-Check:', err));
+  }, 15000);
 });
 
 export default app;

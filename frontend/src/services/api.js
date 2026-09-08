@@ -503,5 +503,61 @@ export const temperatureCycleAPI = {
   },
 };
 
+/**
+ * Experiment API Service
+ * Steuert die "Testwoche" - eine automatisch durchlaufende Sequenz fest
+ * definierter Heizung/Entfeuchter-Kombinationen, um gezielt Vergleichsdaten
+ * für die Verbrauchsanalyse zu erzeugen.
+ */
+export const experimentAPI = {
+  async getStatus() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/experiment/status`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen des Experiment-Status:', error);
+      throw error;
+    }
+  },
+
+  async start() {
+    try {
+      const response = await authorizedFetch(`${API_BASE_URL}/experiment/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Starten des Experiments:', error);
+      throw error;
+    }
+  },
+
+  async stop() {
+    try {
+      const response = await authorizedFetch(`${API_BASE_URL}/experiment/stop`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Stoppen des Experiments:', error);
+      throw error;
+    }
+  },
+};
+
 export default sensorAPI;
 

@@ -1,6 +1,7 @@
 import PlugControl from '../models/PlugControl.js';
 import PlugStateLog from '../models/PlugStateLog.js';
 import SensorMesswert from '../models/SensorMesswert.js';
+import ExperimentPlan from '../models/ExperimentPlan.js';
 import * as temperatureCycleService from './temperatureCycleService.js';
 
 // Bekannte Plug-Definitionen. Neue Steckdosen werden hier eingetragen und
@@ -88,7 +89,14 @@ export const getDesiredStateForESP = async (plugId) => {
 
   console.log(`\n🤖 ESP32 fragt Status ab [${plugId}] | Modus: ${status.mode.toUpperCase()}`);
 
-  if (status.mode === 'auto') {
+  // Läuft gerade ein Experiment (Testwoche, siehe experimentService.js), hat
+  // das Vorrang - die eigene Auto-Logik des Plugs wird währenddessen
+  // übersprungen, damit sie den vom Experiment gesetzten Status nicht
+  // sofort wieder überschreibt.
+  const experiment = await ExperimentPlan.findById('main').lean();
+  const experimentActive = Boolean(experiment?.active);
+
+  if (status.mode === 'auto' && !experimentActive) {
     status = await checkAndUpdateAutoMode(status);
   }
 
@@ -109,8 +117,9 @@ export const getCompleteStatus = async (plugId) => {
   return await PlugControl.getStatus(plugId);
 };
 
-// Gewünschten Status setzen (von Website)
-export const setDesiredState = async (plugId, state) => {
+// Gewünschten Status setzen (von Website, oder intern vom Experiment-Service
+// mit source='experiment')
+export const setDesiredState = async (plugId, state, source = 'manual') => {
   assertKnownPlug(plugId);
 
   if (!['on', 'off'].includes(state)) {
@@ -121,7 +130,7 @@ export const setDesiredState = async (plugId, state) => {
   const newStatus = await PlugControl.setDesiredState(plugId, state);
 
   if (oldStatus.desired_state !== state) {
-    await logStateChange(plugId, state, 'manual');
+    await logStateChange(plugId, state, source);
     await handleStateChange(plugId, oldStatus.desired_state, state, oldStatus);
   }
 

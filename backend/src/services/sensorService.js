@@ -28,7 +28,7 @@ export const getDataByRange = async (startDate, endDate) => {
       $lte: endDate
     }
   })
-  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch -_id')
+  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch stromverbrauch_heizung stromverbrauch_entfeuchter -_id')
   .sort({ zeitstempel: 1 })
   .lean();
 };
@@ -73,7 +73,7 @@ export const getDataByDate = async (date) => {
       $lte: endOfDay
     }
   })
-  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch -_id')
+  .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch stromverbrauch_heizung stromverbrauch_entfeuchter -_id')
   .sort({ zeitstempel: 1 })
   .lean();
 };
