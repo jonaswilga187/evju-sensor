@@ -1,125 +1,88 @@
 import React, { useState, useEffect } from 'react'
 import { plugAPI } from './services/api'
 
-function PlugControl() {
+// Generische Steckdosen-Steuerung. Wird pro Plug einmal eingebunden
+// (z.B. <PlugControl plugId="heizung" .../> und <PlugControl plugId="entfeuchter" .../>).
+//
+// direction: 'below' (Heizung: EIN wenn Messwert UNTER Schwelle) oder
+//            'above' (Entfeuchter: EIN wenn Messwert UEBER Schwelle)
+// unit: '°C' oder '%'
+// min/max: erlaubter Wertebereich für den Schwellenwert-Input
+function PlugControl({ plugId, title, direction, unit, min, max, step = 0.5, icon }) {
   const [plugStatus, setPlugStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState(null)
-  const [temperatureInput, setTemperatureInput] = useState(20)
+  const [thresholdInput, setThresholdInput] = useState(min)
   const [hysteresisInput, setHysteresisInput] = useState(0.5)
 
-  // Status laden
   const fetchStatus = async () => {
     try {
       setError(null)
-      const status = await plugAPI.getStatus()
-      
-      // 🔍 DEBUG-Logging für Browser-Konsole
-      console.log('📊 Status geladen:', {
-        modus: status.mode,
-        schwellenwert: status.temperature_threshold,
-        soll_status: status.desired_state,
-        ist_status: status.reported_state,
-        letzter_abruf: status.last_fetched
-      })
-      
+      const status = await plugAPI.getStatus(plugId)
+
       setPlugStatus(status)
-      // Temperatur-Input mit aktuellem Schwellenwert aktualisieren
-      if (status.temperature_threshold) {
-        setTemperatureInput(status.temperature_threshold)
+      if (status.threshold !== undefined) {
+        setThresholdInput(status.threshold)
       }
       if (status.hysteresis !== undefined) {
         setHysteresisInput(status.hysteresis)
       }
     } catch (err) {
-      console.error('❌ Fehler beim Laden des Plug-Status:', err)
+      console.error(`❌ Fehler beim Laden des Plug-Status (${plugId}):`, err)
       setError('Status konnte nicht geladen werden')
     } finally {
       setLoading(false)
     }
   }
 
-  // Initial laden
   useEffect(() => {
     fetchStatus()
-    
-    // Auto-Update alle 5 Sekunden
     const interval = setInterval(fetchStatus, 5000)
-    
     return () => clearInterval(interval)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plugId])
 
-  // Status umschalten
   const togglePlug = async () => {
     if (!plugStatus || switching || plugStatus.mode === 'auto') return
 
     try {
       setSwitching(true)
       const newState = plugStatus.desired_state === 'on' ? 'off' : 'on'
-      
-      console.log(`🔌 Manuelles Schalten: ${plugStatus.desired_state.toUpperCase()} → ${newState.toUpperCase()}`)
-      
-      const updatedStatus = await plugAPI.setDesiredState(newState)
+      const updatedStatus = await plugAPI.setDesiredState(plugId, newState)
       setPlugStatus(updatedStatus)
-      
-      console.log(`✅ Status gesetzt auf ${newState.toUpperCase()}`)
     } catch (err) {
-      console.error('❌ Fehler beim Schalten:', err)
+      console.error(`❌ Fehler beim Schalten (${plugId}):`, err)
       setError('Schalten fehlgeschlagen')
     } finally {
       setSwitching(false)
     }
   }
 
-  // Modus wechseln
   const toggleMode = async () => {
     if (!plugStatus || switching) return
 
     try {
       setSwitching(true)
       const newMode = plugStatus.mode === 'manual' ? 'auto' : 'manual'
-      
-      console.log(`🔄 Modus-Wechsel: ${plugStatus.mode.toUpperCase()} → ${newMode.toUpperCase()}`, {
-        temperatur_schwellenwert: temperatureInput,
-        hysterese: hysteresisInput
-      })
-      
-      const updatedStatus = await plugAPI.setMode(newMode, temperatureInput, hysteresisInput)
+      const updatedStatus = await plugAPI.setMode(plugId, newMode, thresholdInput, hysteresisInput)
       setPlugStatus(updatedStatus)
-      
-      console.log(`✅ Modus geändert:`, {
-        neuer_modus: updatedStatus.mode,
-        schwellenwert: updatedStatus.temperature_threshold,
-        hysterese: updatedStatus.hysteresis
-      })
     } catch (err) {
-      console.error('❌ Fehler beim Modus-Wechsel:', err)
+      console.error(`❌ Fehler beim Modus-Wechsel (${plugId}):`, err)
       setError('Modus-Wechsel fehlgeschlagen')
     } finally {
       setSwitching(false)
     }
   }
 
-  // Temperaturschwellenwert oder Hysterese ändern
   const updateSettings = async () => {
     if (!plugStatus || plugStatus.mode === 'manual') return
 
     try {
-      console.log(`🌡️ Einstellungen ändern:`, {
-        temperatur: `${plugStatus.temperature_threshold}°C → ${temperatureInput}°C`,
-        hysterese: `${plugStatus.hysteresis}°C → ${hysteresisInput}°C`
-      })
-      
-      const updatedStatus = await plugAPI.setMode('auto', temperatureInput, hysteresisInput)
+      const updatedStatus = await plugAPI.setMode(plugId, 'auto', thresholdInput, hysteresisInput)
       setPlugStatus(updatedStatus)
-      
-      console.log(`✅ Einstellungen aktualisiert`, {
-        temperatur: temperatureInput,
-        hysterese: hysteresisInput
-      })
     } catch (err) {
-      console.error('❌ Fehler beim Aktualisieren der Einstellungen:', err)
+      console.error(`❌ Fehler beim Aktualisieren der Einstellungen (${plugId}):`, err)
       setError('Einstellungen-Update fehlgeschlagen')
     }
   }
@@ -138,7 +101,6 @@ function PlugControl() {
   const isReportedOn = plugStatus?.reported_state === 'on'
   const isSynced = plugStatus?.desired_state === plugStatus?.reported_state
 
-  // Status-Badge-Farbe
   const getStatusColor = () => {
     if (plugStatus?.reported_state === 'unknown') return 'bg-gray-500'
     if (!isSynced) return 'bg-yellow-500'
@@ -151,23 +113,27 @@ function PlugControl() {
     return isReportedOn ? 'Eingeschaltet' : 'Ausgeschaltet'
   }
 
+  // "EIN bei < X°C" (Heizung) vs. "EIN bei > X%" (Entfeuchter)
+  const onCondition = direction === 'below'
+    ? `< ${thresholdInput}${unit}`
+    : `> ${thresholdInput}${unit}`
+  const offCondition = direction === 'below'
+    ? `≥ ${(thresholdInput + hysteresisInput).toFixed(1)}${unit}`
+    : `≤ ${(thresholdInput - hysteresisInput).toFixed(1)}${unit}`
+
   return (
     <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-            <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-            </svg>
-            Heizung Steuerung
+            <span className="text-2xl">{icon}</span>
+            {title} Steuerung
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Heizung über ESP32 fernsteuern
+            {title} über ESP32 fernsteuern
           </p>
         </div>
-        
-        {/* Status Badge */}
+
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${getStatusColor()} animate-pulse`}></div>
           <span className="text-sm font-medium text-gray-700">
@@ -185,7 +151,6 @@ function PlugControl() {
       {/* Modus-Steuerung */}
       <div className="mb-6 bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-purple-200">
         <div className="flex flex-col md:flex-row gap-4 items-center">
-          {/* Modus-Schalter */}
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Steuerungsmodus
@@ -196,8 +161,8 @@ function PlugControl() {
                 disabled={switching}
                 className={`
                   relative inline-flex h-10 w-20 items-center rounded-full transition-all duration-300
-                  ${plugStatus?.mode === 'auto' 
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500' 
+                  ${plugStatus?.mode === 'auto'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
                     : 'bg-gray-300'
                   }
                   ${switching ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg'}
@@ -215,63 +180,52 @@ function PlugControl() {
                   {plugStatus?.mode === 'auto' ? '🤖 Automatik' : '👤 Manuell'}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {plugStatus?.mode === 'auto' 
-                    ? 'Temperaturbasiert' 
-                    : 'Manuelles Schalten'
-                  }
+                  {plugStatus?.mode === 'auto' ? 'Sensorbasiert' : 'Manuelles Schalten'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Temperatur-Einstellung (nur bei Auto) */}
           {plugStatus?.mode === 'auto' && (
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Automatik-Einstellungen
               </label>
               <div className="flex items-start gap-3">
-                {/* Temperaturschwellenwert */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <input
                       type="number"
-                      min="5"
-                      max="30"
-                      step="0.5"
-                      value={temperatureInput}
-                      onChange={(e) => setTemperatureInput(parseFloat(e.target.value))}
+                      min={min}
+                      max={max}
+                      step={step}
+                      value={thresholdInput}
+                      onChange={(e) => setThresholdInput(parseFloat(e.target.value))}
                       onBlur={updateSettings}
                       className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
-                    <span className="text-xs text-gray-600">°C Schwelle</span>
+                    <span className="text-xs text-gray-600">{unit} Schwelle</span>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    EIN bei &lt; {temperatureInput}°C
-                  </p>
+                  <p className="text-xs text-gray-500">EIN bei {onCondition}</p>
                 </div>
-                
-                {/* Hysterese */}
+
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <input
                       type="number"
                       min="0"
-                      max="5"
-                      step="0.1"
+                      max="10"
+                      step="0.5"
                       value={hysteresisInput}
                       onChange={(e) => setHysteresisInput(parseFloat(e.target.value))}
                       onBlur={updateSettings}
                       className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
-                    <span className="text-xs text-gray-600">°C Puffer</span>
+                    <span className="text-xs text-gray-600">{unit} Puffer</span>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    AUS bei ≥ {(temperatureInput + hysteresisInput).toFixed(1)}°C
-                  </p>
+                  <p className="text-xs text-gray-500">AUS bei {offCondition}</p>
                 </div>
-                
-                {/* Update Button */}
+
                 <button
                   onClick={updateSettings}
                   className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm self-start"
@@ -286,7 +240,6 @@ function PlugControl() {
 
       {/* Hauptsteuerung */}
       <div className="flex flex-col md:flex-row gap-6 items-center">
-        {/* Toggle Button */}
         <div className="flex-1 flex justify-center">
           <button
             onClick={togglePlug}
@@ -294,8 +247,8 @@ function PlugControl() {
             className={`
               relative w-48 h-48 rounded-full shadow-2xl transition-all duration-300 transform
               ${switching || plugStatus?.mode === 'auto' ? 'scale-95 opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}
-              ${isOn 
-                ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-green-500/50' 
+              ${isOn
+                ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-green-500/50'
                 : 'bg-gradient-to-br from-gray-300 to-gray-500 shadow-gray-500/50'
               }
             `}
@@ -317,7 +270,6 @@ function PlugControl() {
           </button>
         </div>
 
-        {/* Status-Details */}
         <div className="flex-1 space-y-4">
           <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
@@ -350,7 +302,6 @@ function PlugControl() {
             </div>
           </div>
 
-          {/* Zeitstempel */}
           {plugStatus?.last_fetched && (
             <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
               <p className="text-xs text-gray-600 mb-1">Letzter ESP32-Abruf:</p>
@@ -371,7 +322,6 @@ function PlugControl() {
         </div>
       </div>
 
-      {/* Info-Box */}
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
           <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -382,9 +332,9 @@ function PlugControl() {
               {plugStatus?.mode === 'auto' ? '🤖 Automatik-Modus:' : '👤 Manueller Modus:'}
             </p>
             <p className="text-xs text-blue-700">
-              {plugStatus?.mode === 'auto' 
-                ? `Die Heizung schaltet automatisch ein, wenn die Temperatur unter ${temperatureInput}°C fällt. Sie schaltet bei ${(temperatureInput + hysteresisInput).toFixed(1)}°C wieder aus. Die Hysterese von ${hysteresisInput}°C verhindert ständiges Ein/Ausschalten.`
-                : 'Der ESP32 fragt alle paar Sekunden den gewünschten Status ab. Nach dem Umschalten kann es einen Moment dauern, bis die Heizung reagiert.'
+              {plugStatus?.mode === 'auto'
+                ? `Schaltet automatisch EIN bei ${onCondition}, und wieder AUS bei ${offCondition}. Die Hysterese von ${hysteresisInput}${unit} verhindert ständiges Ein/Ausschalten.`
+                : 'Der ESP32 fragt regelmäßig den gewünschten Status ab. Nach dem Umschalten kann es einen Moment dauern, bis die Dose reagiert.'
               }
             </p>
           </div>
@@ -395,4 +345,3 @@ function PlugControl() {
 }
 
 export default PlugControl
-

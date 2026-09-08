@@ -4,6 +4,8 @@ import { sensorAPI, systemAPI } from './services/api'
 import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
 import TemperatureCycles from './TemperatureCycles'
+import ApiKeySettings from './ApiKeySettings'
+import ConsumptionAnalysis from './ConsumptionAnalysis'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
@@ -456,9 +458,36 @@ function App() {
             </ResponsiveContainer>
           </div>
 
-          {/* Heizung Steuerung */}
+          {/* API-Key für Schreibzugriffe (Heizung/Entfeuchter schalten) */}
+          <ApiKeySettings />
+
+          {/* Heizung & Entfeuchter Steuerung */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+            <PlugControl
+              plugId="heizung"
+              title="Heizung"
+              direction="below"
+              unit="°C"
+              min={5}
+              max={30}
+              step={0.5}
+              icon="🔥"
+            />
+            <PlugControl
+              plugId="entfeuchter"
+              title="Luftentfeuchter"
+              direction="above"
+              unit="%"
+              min={0}
+              max={100}
+              step={1}
+              icon="💧"
+            />
+          </div>
+
+          {/* Verbrauchsvergleich der Kombinationen */}
           <div className="mb-8">
-            <PlugControl />
+            <ConsumptionAnalysis />
           </div>
 
           {/* Tagesvergleich */}

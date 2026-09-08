@@ -3,6 +3,7 @@ import sensorRoutes from './sensorRoutes.js';
 import plugRoutes from './plugRoutes.js';
 import cycleRoutes from './cycleRoutes.js';
 import weatherRoutes from './weatherRoutes.js';
+import analysisRoutes from './analysisRoutes.js';
 
 const router = express.Router();
 
@@ -36,6 +37,7 @@ router.use('/sensors', sensorRoutes);
 router.use('/plug', plugRoutes);
 router.use('/cycles', cycleRoutes);
 router.use('/weather', weatherRoutes);
+router.use('/analysis', analysisRoutes);
 
 export default router;
 

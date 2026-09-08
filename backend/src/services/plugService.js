@@ -1,31 +1,100 @@
 import PlugControl from '../models/PlugControl.js';
+import PlugStateLog from '../models/PlugStateLog.js';
 import SensorMesswert from '../models/SensorMesswert.js';
 import * as temperatureCycleService from './temperatureCycleService.js';
 
-// In-Memory State für laufende Zyklen
-const activeCycles = {
-  heating: null,  // { startTime, startTemperature, threshold, hysteresis, mode }
-  cooling: null   // { startTime, startTemperature, threshold, hysteresis, mode }
+// Bekannte Plug-Definitionen. Neue Steckdosen werden hier eingetragen und
+// beim Server-Start automatisch angelegt (siehe initPlugs unten).
+// control_direction:
+//   'below' -> einschalten wenn Messwert UNTER threshold (z.B. Heizung)
+//   'above' -> einschalten wenn Messwert UEBER threshold (z.B. Entfeuchter)
+export const PLUG_DEFINITIONS = {
+  heizung: {
+    label: 'Heizung',
+    control_metric: 'temperature',
+    control_direction: 'below',
+    threshold: 20.0,
+    hysteresis: 0.5
+  },
+  entfeuchter: {
+    label: 'Luftentfeuchter',
+    control_metric: 'humidity',
+    control_direction: 'above',
+    threshold: 60,
+    hysteresis: 5
+  }
+};
+
+// In-Memory State für laufende Zyklen, jetzt pro Plug-ID statt global
+// { [plugId]: { startTime, startValue, threshold, hysteresis, mode, type: 'heating'|'cooling' } }
+const activeCycles = {};
+
+// Legt alle bekannten Plugs an, falls sie noch nicht existieren.
+// Wird einmalig beim Server-Start aufgerufen (server.js).
+export const initPlugs = async () => {
+  // Einmalige Migration: der alte, hartcodierte Single-Plug-Datensatz
+  // "shelly_plug_main" (vor der Mehrfach-Plug-Umstellung) wird als Startwert
+  // für "heizung" übernommen, statt verwaist in der DB liegen zu bleiben.
+  const legacy = await PlugControl.collection.findOne({ _id: 'shelly_plug_main' });
+
+  for (const [plugId, defaults] of Object.entries(PLUG_DEFINITIONS)) {
+    const alreadyExists = await PlugControl.findById(plugId);
+    if (alreadyExists) continue;
+
+    let initial = { ...defaults };
+    if (plugId === 'heizung' && legacy) {
+      initial = {
+        ...defaults,
+        mode: legacy.mode || defaults.mode,
+        threshold: legacy.temperature_threshold ?? defaults.threshold,
+        hysteresis: legacy.hysteresis ?? defaults.hysteresis,
+        desired_state: legacy.desired_state || 'off'
+      };
+      console.log('♻️  Alten Einzel-Plug-Datensatz ("shelly_plug_main") nach "heizung" übernommen');
+    }
+
+    await PlugControl.ensureExists(plugId, initial);
+  }
+
+  if (legacy) {
+    await PlugControl.collection.deleteOne({ _id: 'shelly_plug_main' });
+  }
+};
+
+const getMetricValue = (sensorReading, metric) => {
+  return metric === 'temperature' ? sensorReading.temperatur : sensorReading.luftfeuchtigkeit;
+};
+
+const metricUnit = (metric) => (metric === 'temperature' ? '°C' : '%');
+
+const assertKnownPlug = (plugId) => {
+  if (!PLUG_DEFINITIONS[plugId]) {
+    const err = new Error(`Unbekannte Plug-ID: "${plugId}". Bekannt: ${Object.keys(PLUG_DEFINITIONS).join(', ')}`);
+    err.statusCode = 404;
+    throw err;
+  }
+};
+
+// Alle Plugs abrufen (für Dashboard-Übersicht)
+export const getAllStatuses = async () => {
+  return await PlugControl.getAll();
 };
 
 // Status für ESP32 abrufen (ESP32 fragt: "Was soll ich tun?")
-export const getDesiredStateForESP = async () => {
-  let status = await PlugControl.getStatus();
-  
-  console.log(`\n🤖 ESP32 fragt Status ab | Modus: ${status.mode.toUpperCase()}`);
-  
-  // Im Automatik-Modus: Prüfe Temperatur und setze desired_state automatisch
+export const getDesiredStateForESP = async (plugId) => {
+  assertKnownPlug(plugId);
+  let status = await PlugControl.getStatus(plugId);
+
+  console.log(`\n🤖 ESP32 fragt Status ab [${plugId}] | Modus: ${status.mode.toUpperCase()}`);
+
   if (status.mode === 'auto') {
-    console.log('🔄 Automatik-Modus aktiv → Prüfe Temperatur...');
     status = await checkAndUpdateAutoMode(status);
-  } else {
-    console.log('👤 Manueller Modus → Nutze gesetzten Status');
   }
-  
-  await PlugControl.markFetched();
-  
-  console.log(`📤 Antwort an ESP32: ${status.desired_state.toUpperCase()}\n`);
-  
+
+  await PlugControl.markFetched(plugId);
+
+  console.log(`📤 Antwort an ESP32 [${plugId}]: ${status.desired_state.toUpperCase()}\n`);
+
   return {
     desired_state: status.desired_state,
     last_changed: status.last_changed,
@@ -33,247 +102,269 @@ export const getDesiredStateForESP = async () => {
   };
 };
 
-// Status für Website abrufen (komplett)
-export const getCompleteStatus = async () => {
-  return await PlugControl.getStatus();
+// Status für Website abrufen (komplett, ein Plug)
+export const getCompleteStatus = async (plugId) => {
+  assertKnownPlug(plugId);
+  return await PlugControl.getStatus(plugId);
 };
 
 // Gewünschten Status setzen (von Website)
-export const setDesiredState = async (state) => {
+export const setDesiredState = async (plugId, state) => {
+  assertKnownPlug(plugId);
+
   if (!['on', 'off'].includes(state)) {
     throw new Error('Status muss "on" oder "off" sein');
   }
-  
-  const oldStatus = await PlugControl.getStatus();
-  const newStatus = await PlugControl.setDesiredState(state);
-  
-  // Zyklus-Erkennung bei manueller Status-Änderung
+
+  const oldStatus = await PlugControl.getStatus(plugId);
+  const newStatus = await PlugControl.setDesiredState(plugId, state);
+
   if (oldStatus.desired_state !== state) {
-    await handleStateChange(oldStatus.desired_state, state, oldStatus);
+    await logStateChange(plugId, state, 'manual');
+    await handleStateChange(plugId, oldStatus.desired_state, state, oldStatus);
   }
-  
+
   return newStatus;
 };
 
 // Gemeldeten Status aktualisieren (von ESP32)
-export const updateReportedState = async (state) => {
+export const updateReportedState = async (plugId, state) => {
+  assertKnownPlug(plugId);
+
   if (!['on', 'off', 'unknown'].includes(state)) {
     throw new Error('Gemeldeter Status muss "on", "off" oder "unknown" sein');
   }
-  
-  return await PlugControl.updateReportedState(state);
+
+  return await PlugControl.updateReportedState(plugId, state);
 };
 
 // Modus setzen (manual/auto) und optional Schwellenwert + Hysterese
-export const setMode = async (mode, temperatureThreshold, hysteresis) => {
+export const setMode = async (plugId, mode, threshold, hysteresis) => {
+  assertKnownPlug(plugId);
+
   if (!['manual', 'auto'].includes(mode)) {
     throw new Error('Modus muss "manual" oder "auto" sein');
   }
-  
-  if (temperatureThreshold !== undefined) {
-    if (temperatureThreshold < 5 || temperatureThreshold > 30) {
-      throw new Error('Temperaturschwellenwert muss zwischen 5°C und 30°C liegen');
+
+  const metric = PLUG_DEFINITIONS[plugId].control_metric;
+  const limits = metric === 'temperature'
+    ? { min: 5, max: 30, label: 'Temperaturschwellenwert', unit: '°C' }
+    : { min: 0, max: 100, label: 'Luftfeuchtigkeits-Schwellenwert', unit: '%' };
+
+  if (threshold !== undefined) {
+    if (threshold < limits.min || threshold > limits.max) {
+      throw new Error(`${limits.label} muss zwischen ${limits.min}${limits.unit} und ${limits.max}${limits.unit} liegen`);
     }
   }
-  
+
   if (hysteresis !== undefined) {
-    if (hysteresis < 0 || hysteresis > 5) {
-      throw new Error('Hysterese muss zwischen 0°C und 5°C liegen');
+    if (hysteresis < 0 || hysteresis > 10) {
+      throw new Error('Hysterese muss zwischen 0 und 10 liegen');
     }
   }
-  
-  return await PlugControl.setMode(mode, temperatureThreshold, hysteresis);
+
+  return await PlugControl.setMode(plugId, mode, threshold, hysteresis);
 };
 
-// Automatik-Logik: Prüft Temperatur und aktualisiert desired_state
-const checkAndUpdateAutoMode = async (status) => {
+// Log-Eintrag für Verbrauchsanalyse (siehe analysisService.js)
+const logStateChange = async (plugId, state, source) => {
   try {
-    console.log('\n🔍 Automatik-Check wird ausgeführt...');
-    
-    // Hole letzte Temperaturmessung
+    await PlugStateLog.create({ plug_id: plugId, state, source, timestamp: new Date() });
+  } catch (error) {
+    console.error(`❌ Fehler beim Loggen der Zustandsänderung [${plugId}]:`, error);
+  }
+};
+
+// Automatik-Logik: Prüft den relevanten Messwert (Temperatur ODER Luftfeuchtigkeit,
+// je nach control_metric des Plugs) und aktualisiert desired_state entsprechend
+// der Reglerrichtung (control_direction).
+const checkAndUpdateAutoMode = async (status) => {
+  const plugId = status._id;
+  const def = PLUG_DEFINITIONS[plugId];
+
+  try {
     const latestSensor = await SensorMesswert.getLatest();
-    
-    if (!latestSensor || !latestSensor.temperatur) {
-      console.log('⚠ Automatik-Modus: Keine Sensordaten verfügbar');
+
+    if (!latestSensor) {
+      console.log(`⚠ Automatik-Modus [${plugId}]: Keine Sensordaten verfügbar`);
       return status;
     }
-    
-    const currentTemp = latestSensor.temperatur;
-    const threshold = status.temperature_threshold;
+
+    const currentValue = getMetricValue(latestSensor, def.control_metric);
+    if (currentValue === undefined || currentValue === null) {
+      console.log(`⚠ Automatik-Modus [${plugId}]: Messwert für "${def.control_metric}" fehlt`);
+      return status;
+    }
+
+    const threshold = status.threshold;
     const hysteresis = status.hysteresis || 0.5;
+    const unit = metricUnit(def.control_metric);
     const currentDesiredState = status.desired_state;
-    
-    console.log(`📊 Temperatur: ${currentTemp}°C | Schwellenwert: ${threshold}°C | Hysterese: ${hysteresis}°C | Aktuell: ${currentDesiredState.toUpperCase()}`);
-    
-    // Entscheidungslogik: Temperatur < Schwellenwert → Heizung EIN
+
+    console.log(`📊 [${plugId}] ${def.control_metric}: ${currentValue}${unit} | Schwelle: ${threshold}${unit} | Hysterese: ${hysteresis}${unit} | Aktuell: ${currentDesiredState.toUpperCase()}`);
+
     let newDesiredState = status.desired_state;
-    
-    if (currentTemp < threshold) {
-      newDesiredState = 'on';
-      console.log(`❄️ Zu kalt! ${currentTemp}°C < ${threshold}°C → Heizung EINSCHALTEN`);
-    } else if (currentTemp >= threshold + hysteresis) {
-      // Hysterese: X°C über Schwelle → Heizung AUS
-      newDesiredState = 'off';
-      console.log(`🔥 Warm genug! ${currentTemp}°C >= ${(threshold + hysteresis).toFixed(1)}°C → Heizung AUSSCHALTEN`);
+
+    if (def.control_direction === 'below') {
+      // z.B. Heizung: einschalten wenn zu kalt, ausschalten wenn warm genug
+      if (currentValue < threshold) {
+        newDesiredState = 'on';
+      } else if (currentValue >= threshold + hysteresis) {
+        newDesiredState = 'off';
+      }
     } else {
-      console.log(`⏸️ Hysterese-Bereich (${threshold}°C - ${(threshold + hysteresis).toFixed(1)}°C) → Keine Änderung`);
+      // 'above', z.B. Entfeuchter: einschalten wenn zu feucht, ausschalten wenn trocken genug
+      if (currentValue > threshold) {
+        newDesiredState = 'on';
+      } else if (currentValue <= threshold - hysteresis) {
+        newDesiredState = 'off';
+      }
     }
-    
-    // Status nur ändern, wenn nötig
+
     if (newDesiredState !== status.desired_state) {
-      console.log(`✅ Status-Änderung: ${currentDesiredState.toUpperCase()} → ${newDesiredState.toUpperCase()}`);
+      console.log(`✅ [${plugId}] Status-Änderung: ${currentDesiredState.toUpperCase()} → ${newDesiredState.toUpperCase()}`);
       const oldState = status.desired_state;
-      status = await PlugControl.setDesiredState(newDesiredState);
+      status = await PlugControl.setDesiredState(plugId, newDesiredState);
       status.mode = 'auto';
-      status.temperature_threshold = threshold;
-      
-      // Zyklus-Erkennung bei Status-Änderung
-      await handleStateChange(oldState, newDesiredState, status, currentTemp);
+
+      await logStateChange(plugId, newDesiredState, 'auto');
+      await handleStateChange(plugId, oldState, newDesiredState, status, currentValue);
     } else {
-      console.log(`⏭️ Keine Änderung nötig (bleibt ${currentDesiredState.toUpperCase()})`);
-      
-      // Prüfe ob laufender Zyklus beendet werden kann
-      await checkActiveCycles(status, currentTemp);
+      await checkActiveCycles(plugId, status, currentValue);
     }
-    
+
     return status;
   } catch (error) {
-    console.error('❌ Fehler in Automatik-Logik:', error);
+    console.error(`❌ Fehler in Automatik-Logik [${plugId}]:`, error);
     return status;
   }
 };
 
-// Zyklus-Erkennung: Status-Änderung verarbeiten
-const handleStateChange = async (oldState, newState, status, currentTemp = null) => {
+// Zyklus-Erkennung: Status-Änderung verarbeiten (generisch pro Plug)
+const handleStateChange = async (plugId, oldState, newState, status, currentValue = null) => {
   try {
-    // Hole aktuelle Temperatur falls nicht übergeben
-    if (currentTemp === null) {
+    const def = PLUG_DEFINITIONS[plugId];
+
+    if (currentValue === null) {
       const latestSensor = await SensorMesswert.getLatest();
-      currentTemp = latestSensor?.temperatur || null;
+      currentValue = latestSensor ? getMetricValue(latestSensor, def.control_metric) : null;
     }
-    
-    if (currentTemp === null) {
-      console.log('⚠️ Keine Temperaturdaten für Zyklus-Erkennung verfügbar');
+
+    if (currentValue === null || currentValue === undefined) {
+      console.log(`⚠️ [${plugId}] Keine Messdaten für Zyklus-Erkennung verfügbar`);
       return;
     }
-    
-    const threshold = status.temperature_threshold;
+
+    const threshold = status.threshold;
     const hysteresis = status.hysteresis || 0.5;
     const now = new Date();
-    
-    // Heizzyklus starten: 'off' → 'on'
+
+    if (!activeCycles[plugId]) {
+      activeCycles[plugId] = { heating: null, cooling: null };
+    }
+    const cycles = activeCycles[plugId];
+
+    // 'off' -> 'on': Wirk-Zyklus startet (Heizen bzw. Entfeuchten)
     if (oldState === 'off' && newState === 'on') {
-      // Beende eventuell laufenden Abkühlzyklus (sollte nicht passieren, aber sicherheitshalber)
-      if (activeCycles.cooling) {
-        console.log('⚠️ Abkühlzyklus wurde durch Heizzyklus-Start unterbrochen');
-        activeCycles.cooling = null;
+      if (cycles.cooling) {
+        cycles.cooling = null;
       }
-      
-      activeCycles.heating = {
+
+      cycles.heating = {
         startTime: now,
-        startTemperature: currentTemp,
-        threshold: threshold,
-        hysteresis: hysteresis,
+        startValue: currentValue,
+        threshold,
+        hysteresis,
         mode: status.mode
       };
-      console.log(`🔥 Heizzyklus gestartet: ${currentTemp}°C → Ziel: ${threshold}°C`);
+      console.log(`🔥 [${plugId}] Wirk-Zyklus gestartet: ${currentValue} → Ziel: ${threshold}`);
     }
-    
-    // Abkühlzyklus starten: 'on' → 'off'
+
+    // 'on' -> 'off': Wirk-Zyklus endet, Ruhe-Zyklus startet
     if (oldState === 'on' && newState === 'off') {
-      // Beende eventuell laufenden Heizzyklus
-      if (activeCycles.heating) {
-        const cycle = activeCycles.heating;
-        const endTemp = currentTemp;
-        const targetTemp = cycle.threshold + cycle.hysteresis;
-        
-        // Prüfe ob Zieltemperatur erreicht wurde (Schwelle + Hysterese)
-        if (endTemp >= targetTemp) {
+      if (cycles.heating) {
+        const cycle = cycles.heating;
+        const endValue = currentValue;
+        const targetValue = def.control_direction === 'below'
+          ? cycle.threshold + cycle.hysteresis
+          : cycle.threshold - cycle.hysteresis;
+
+        const targetReached = def.control_direction === 'below'
+          ? endValue >= targetValue
+          : endValue <= targetValue;
+
+        if (targetReached) {
           await temperatureCycleService.saveCycle(
-            'heating',
-            cycle.startTime,
-            now,
-            cycle.startTemperature,
-            targetTemp,
-            cycle.threshold,
-            cycle.hysteresis,
-            cycle.mode
+            'heating', cycle.startTime, now, cycle.startValue, targetValue,
+            cycle.threshold, cycle.hysteresis, cycle.mode, plugId
           );
-          console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${targetTemp}°C`);
         } else {
-          console.log(`⚠️ Heizzyklus unterbrochen (Ziel nicht erreicht): ${cycle.startTemperature}°C → ${endTemp}°C`);
+          console.log(`⚠️ [${plugId}] Zyklus unterbrochen (Ziel nicht erreicht): ${cycle.startValue} → ${endValue}`);
         }
-        activeCycles.heating = null;
+        cycles.heating = null;
       }
-      
-      // Start-Temperatur für Abkühlzyklus ist threshold + hysteresis (wo die Heizung ausgeschaltet wurde)
-      const coolingStartTemp = threshold + hysteresis;
-      activeCycles.cooling = {
+
+      const restStartValue = def.control_direction === 'below'
+        ? threshold + hysteresis
+        : threshold - hysteresis;
+
+      cycles.cooling = {
         startTime: now,
-        startTemperature: coolingStartTemp,
-        threshold: threshold,
-        hysteresis: hysteresis,
+        startValue: restStartValue,
+        threshold,
+        hysteresis,
         mode: status.mode
       };
-      console.log(`❄️ Abkühlzyklus gestartet: ${coolingStartTemp}°C → Ziel: ${threshold}°C`);
     }
   } catch (error) {
-    console.error('❌ Fehler bei Zyklus-Erkennung:', error);
+    console.error(`❌ Fehler bei Zyklus-Erkennung [${plugId}]:`, error);
   }
 };
 
-// Prüfe ob laufende Zyklen beendet werden können
-const checkActiveCycles = async (status, currentTemp) => {
+// Prüfe ob laufende Zyklen beendet werden können (generisch pro Plug)
+const checkActiveCycles = async (plugId, status, currentValue) => {
   try {
-    const threshold = status.temperature_threshold;
+    const def = PLUG_DEFINITIONS[plugId];
+    const threshold = status.threshold;
     const hysteresis = status.hysteresis || 0.5;
     const now = new Date();
-    
-    // Prüfe Heizzyklus
-    if (activeCycles.heating) {
-      const cycle = activeCycles.heating;
-      const targetTemp = cycle.threshold + cycle.hysteresis;
-      
-      // Heizzyklus ist beendet wenn Temperatur >= threshold + hysteresis
-      if (currentTemp >= targetTemp) {
+
+    if (!activeCycles[plugId]) return;
+    const cycles = activeCycles[plugId];
+
+    if (cycles.heating) {
+      const cycle = cycles.heating;
+      const targetValue = def.control_direction === 'below'
+        ? cycle.threshold + cycle.hysteresis
+        : cycle.threshold - cycle.hysteresis;
+      const targetReached = def.control_direction === 'below'
+        ? currentValue >= targetValue
+        : currentValue <= targetValue;
+
+      if (targetReached) {
         await temperatureCycleService.saveCycle(
-          'heating',
-          cycle.startTime,
-          now,
-          cycle.startTemperature,
-          targetTemp,
-          cycle.threshold,
-          cycle.hysteresis,
-          cycle.mode
+          'heating', cycle.startTime, now, cycle.startValue, targetValue,
+          cycle.threshold, cycle.hysteresis, cycle.mode, plugId
         );
-        console.log(`✅ Heizzyklus abgeschlossen: ${cycle.startTemperature}°C → ${targetTemp}°C`);
-        activeCycles.heating = null;
+        cycles.heating = null;
       }
     }
-    
-    // Prüfe Abkühlzyklus
-    if (activeCycles.cooling) {
-      const cycle = activeCycles.cooling;
-      
-      // Abkühlzyklus ist beendet wenn Temperatur <= threshold
-      if (currentTemp <= cycle.threshold) {
+
+    if (cycles.cooling) {
+      const cycle = cycles.cooling;
+      const restReached = def.control_direction === 'below'
+        ? currentValue <= cycle.threshold
+        : currentValue >= cycle.threshold;
+
+      if (restReached) {
         await temperatureCycleService.saveCycle(
-          'cooling',
-          cycle.startTime,
-          now,
-          cycle.startTemperature,
-          currentTemp,
-          cycle.threshold,
-          cycle.hysteresis,
-          cycle.mode
+          'cooling', cycle.startTime, now, cycle.startValue, currentValue,
+          cycle.threshold, cycle.hysteresis, cycle.mode, plugId
         );
-        console.log(`✅ Abkühlzyklus abgeschlossen: ${cycle.startTemperature}°C → ${currentTemp}°C`);
-        activeCycles.cooling = null;
+        cycles.cooling = null;
       }
     }
   } catch (error) {
-    console.error('❌ Fehler beim Prüfen aktiver Zyklen:', error);
+    console.error(`❌ Fehler beim Prüfen aktiver Zyklen [${plugId}]:`, error);
   }
 };
-
-

@@ -238,35 +238,56 @@ export const sensorAPI = {
 
 /**
  * Plug Control API Service
- * API-Aufrufe für die Steckdosen-Steuerung
+ * API-Aufrufe für die Steckdosen-Steuerung. Unterstützt mehrere Plugs
+ * (z.B. "heizung", "entfeuchter") über die plugId.
  */
 export const plugAPI = {
   /**
-   * Kompletten Status abrufen (für Website)
-   * @returns {Promise<Object>} Status-Objekt mit desired_state, reported_state, timestamps
+   * Übersicht aller Plugs abrufen
+   * @returns {Promise<Array>} Array aller Plug-Status-Objekte
    */
-  async getStatus() {
+  async getAll() {
     try {
-      const response = await fetch(`${API_BASE_URL}/plug/status`);
+      const response = await fetch(`${API_BASE_URL}/plug`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const { data } = await response.json();
       return data;
     } catch (error) {
-      console.error('Fehler beim Abrufen des Plug-Status:', error);
+      console.error('Fehler beim Abrufen aller Plugs:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Kompletten Status eines Plugs abrufen (für Website)
+   * @param {string} plugId - z.B. "heizung" oder "entfeuchter"
+   * @returns {Promise<Object>} Status-Objekt mit desired_state, reported_state, timestamps
+   */
+  async getStatus(plugId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/plug/${plugId}/status`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`Fehler beim Abrufen des Plug-Status (${plugId}):`, error);
       throw error;
     }
   },
 
   /**
    * Gewünschten Status setzen (Steckdose ein/aus)
+   * @param {string} plugId - z.B. "heizung" oder "entfeuchter"
    * @param {string} state - "on" oder "off"
    * @returns {Promise<Object>} Aktualisierter Status
    */
-  async setDesiredState(state) {
+  async setDesiredState(plugId, state) {
     try {
-      const response = await authorizedFetch(`${API_BASE_URL}/plug/desired`, {
+      const response = await authorizedFetch(`${API_BASE_URL}/plug/${plugId}/desired`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -279,29 +300,30 @@ export const plugAPI = {
       const { data } = await response.json();
       return data;
     } catch (error) {
-      console.error('Fehler beim Setzen des Plug-Status:', error);
+      console.error(`Fehler beim Setzen des Plug-Status (${plugId}):`, error);
       throw error;
     }
   },
 
   /**
    * Steuerungsmodus setzen (manual/auto)
+   * @param {string} plugId - z.B. "heizung" oder "entfeuchter"
    * @param {string} mode - "manual" oder "auto"
-   * @param {number} temperature_threshold - Optional: Temperaturschwellenwert (5-30°C)
-   * @param {number} hysteresis - Optional: Hysterese (0-5°C)
+   * @param {number} threshold - Optional: Schwellenwert (°C bei Heizung, % bei Entfeuchter)
+   * @param {number} hysteresis - Optional: Hysterese
    * @returns {Promise<Object>} Aktualisierter Status
    */
-  async setMode(mode, temperature_threshold, hysteresis) {
+  async setMode(plugId, mode, threshold, hysteresis) {
     try {
       const body = { mode };
-      if (temperature_threshold !== undefined) {
-        body.temperature_threshold = temperature_threshold;
+      if (threshold !== undefined) {
+        body.threshold = threshold;
       }
       if (hysteresis !== undefined) {
         body.hysteresis = hysteresis;
       }
-      
-      const response = await authorizedFetch(`${API_BASE_URL}/plug/mode`, {
+
+      const response = await authorizedFetch(`${API_BASE_URL}/plug/${plugId}/mode`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -314,7 +336,32 @@ export const plugAPI = {
       const { data } = await response.json();
       return data;
     } catch (error) {
-      console.error('Fehler beim Setzen des Modus:', error);
+      console.error(`Fehler beim Setzen des Modus (${plugId}):`, error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * Analysis API Service
+ * Verbrauchsvergleich der Plug-Kombinationen (read-only, keine Steuerung)
+ */
+export const analysisAPI = {
+  /**
+   * Verbrauchsvergleich abrufen
+   * @param {number} days - Zeitraum in Tagen (default: 30)
+   * @returns {Promise<Object>} { since, until, targetRange, combinations }
+   */
+  async getConsumptionComparison(days = 30) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/analysis/consumption?days=${days}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Verbrauchsanalyse:', error);
       throw error;
     }
   },

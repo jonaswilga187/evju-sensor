@@ -12,12 +12,13 @@ import TemperatureCycle from '../models/TemperatureCycle.js';
  * @param {string} mode - 'auto' oder 'manual'
  * @returns {Promise<Object>} Gespeicherter Zyklus
  */
-export const saveCycle = async (type, startTime, endTime, startTemperature, endTemperature, threshold, hysteresis, mode) => {
+export const saveCycle = async (type, startTime, endTime, startTemperature, endTemperature, threshold, hysteresis, mode, plugId = 'heizung') => {
   try {
     const durationMs = endTime - startTime;
     const durationMinutes = Math.round(durationMs / (1000 * 60));
-    
+
     const cycle = await TemperatureCycle.create({
+      plug_id: plugId,
       cycle_type: type,
       start_time: startTime,
       end_time: endTime,

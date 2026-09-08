@@ -1,10 +1,31 @@
 import mongoose from 'mongoose';
 
+// Generisches Plug-Control-Modell - unterstützt beliebig viele Steckdosen
+// (z.B. "heizung", "entfeuchter"), nicht mehr auf eine einzige Dose hartcodiert.
 const plugControlSchema = new mongoose.Schema({
-  // Es gibt immer nur einen Eintrag mit dieser ID
+  // Frei wählbare Plug-ID, z.B. "heizung" oder "entfeuchter"
   _id: {
     type: String,
-    default: 'shelly_plug_main'
+    required: true
+  },
+  // Anzeigename für Dashboard/Logs
+  label: {
+    type: String,
+    required: true
+  },
+  // Welcher Messwert steuert den Automatik-Modus dieser Dose?
+  control_metric: {
+    type: String,
+    enum: ['temperature', 'humidity'],
+    required: true
+  },
+  // Reglerrichtung:
+  //   'below' -> einschalten, wenn Messwert UNTER threshold faellt (z.B. Heizung)
+  //   'above' -> einschalten, wenn Messwert UEBER threshold steigt (z.B. Entfeuchter)
+  control_direction: {
+    type: String,
+    enum: ['below', 'above'],
+    required: true
   },
   // Steuerungsmodus
   mode: {
@@ -12,19 +33,17 @@ const plugControlSchema = new mongoose.Schema({
     enum: ['manual', 'auto'],
     default: 'manual'
   },
-  // Temperaturschwellenwert für Automatik-Modus (in °C)
-  temperature_threshold: {
+  // Schwellenwert fuer Automatik-Modus (Einheit abhaengig von control_metric: °C oder %)
+  threshold: {
     type: Number,
-    default: 20.0,
-    min: 5,
-    max: 30
+    required: true
   },
-  // Hysterese (Temperatur-Puffer in °C)
+  // Hysterese (Puffer in derselben Einheit wie threshold)
   hysteresis: {
     type: Number,
     default: 0.5,
     min: 0,
-    max: 5
+    max: 10
   },
   // Gewünschter Status (von Website gesetzt, von ESP32 abgerufen)
   desired_state: {
@@ -59,99 +78,81 @@ const plugControlSchema = new mongoose.Schema({
   collection: 'plug_control'
 });
 
-// Statische Methode: Status abrufen (erstellt automatisch wenn nicht vorhanden)
-plugControlSchema.statics.getStatus = async function() {
-  let status = await this.findById('shelly_plug_main');
-  
+// Statische Methode: Status abrufen (erstellt NICHT automatisch - dafuer ist
+// jetzt initPlugs() beim Server-Start zustaendig, da wir mehrere Plugs mit
+// unterschiedlichen Defaults haben)
+plugControlSchema.statics.getStatus = async function(plugId) {
+  const status = await this.findById(plugId);
   if (!status) {
-    // Erstelle initialen Status
-    status = await this.create({
-      _id: 'shelly_plug_main',
-      mode: 'manual',
-      temperature_threshold: 20.0,
-      hysteresis: 0.5,
-      desired_state: 'off',
-      reported_state: 'unknown'
-    });
+    const err = new Error(`Unbekannte Plug-ID: "${plugId}"`);
+    err.statusCode = 404;
+    throw err;
   }
-  
   return status;
 };
 
+// Statische Methode: alle Plugs abrufen (fuer Dashboard-Uebersicht)
+plugControlSchema.statics.getAll = async function() {
+  return await this.find({}).sort({ _id: 1 });
+};
+
+// Legt einen Plug an, falls er noch nicht existiert (idempotent, fuer Seed/Startup)
+plugControlSchema.statics.ensureExists = async function(plugId, defaults) {
+  const existing = await this.findById(plugId);
+  if (existing) {
+    return existing;
+  }
+  return await this.create({ _id: plugId, ...defaults });
+};
+
 // Statische Methode: Gewünschten Status setzen (von Website)
-plugControlSchema.statics.setDesiredState = async function(state) {
+plugControlSchema.statics.setDesiredState = async function(plugId, state) {
   return await this.findByIdAndUpdate(
-    'shelly_plug_main',
+    plugId,
     {
       desired_state: state,
       last_changed: new Date()
     },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
-    }
+    { new: true }
   );
 };
 
 // Statische Methode: Status wurde abgerufen (von ESP32)
-plugControlSchema.statics.markFetched = async function() {
+plugControlSchema.statics.markFetched = async function(plugId) {
   return await this.findByIdAndUpdate(
-    'shelly_plug_main',
-    {
-      last_fetched: new Date()
-    },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
-    }
+    plugId,
+    { last_fetched: new Date() },
+    { new: true }
   );
 };
 
 // Statische Methode: Gemeldeten Status aktualisieren (von ESP32)
-plugControlSchema.statics.updateReportedState = async function(state) {
+plugControlSchema.statics.updateReportedState = async function(plugId, state) {
   return await this.findByIdAndUpdate(
-    'shelly_plug_main',
+    plugId,
     {
       reported_state: state,
       last_reported: new Date()
     },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
-    }
+    { new: true }
   );
 };
 
 // Statische Methode: Modus setzen (manual/auto)
-plugControlSchema.statics.setMode = async function(mode, threshold, hysteresis) {
-  const update = {
-    mode: mode
-  };
-  
+plugControlSchema.statics.setMode = async function(plugId, mode, threshold, hysteresis) {
+  const update = { mode };
+
   if (threshold !== undefined) {
-    update.temperature_threshold = threshold;
+    update.threshold = threshold;
   }
-  
+
   if (hysteresis !== undefined) {
     update.hysteresis = hysteresis;
   }
-  
-  return await this.findByIdAndUpdate(
-    'shelly_plug_main',
-    update,
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
-    }
-  );
+
+  return await this.findByIdAndUpdate(plugId, update, { new: true });
 };
 
 const PlugControl = mongoose.model('PlugControl', plugControlSchema);
 
 export default PlugControl;
-
-

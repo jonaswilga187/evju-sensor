@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
 import routes from './routes/index.js';
 import { checkVerbrauchAlarm } from './services/verbrauchAlarmService.js';
+import { initPlugs } from './services/plugService.js';
 
 // Umgebungsvariablen laden
 dotenv.config();
@@ -67,6 +68,7 @@ app.listen(PORT, () => {
   // Sofort beim Start prüfen (nach kurzer Verzögerung, damit DB verbunden ist)
   setTimeout(() => {
     checkVerbrauchAlarm();
+    initPlugs().catch((err) => console.error('❌ Fehler beim Anlegen der Plugs:', err));
   }, 10000); // 10 Sekunden nach Start
   
   // Regelmäßig prüfen

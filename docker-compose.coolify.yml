@@ -39,6 +39,11 @@ services:
       EMAIL_TO: '${EMAIL_TO:-}'
       VERBRAUCH_SCHWELLENWERT: '${VERBRAUCH_SCHWELLENWERT:-12}'
       VERBRAUCH_CHECK_INTERVAL_MINUTES: '${VERBRAUCH_CHECK_INTERVAL_MINUTES:-60}'
+      # Ziel-Komfortbereich für die Verbrauchsanalyse (nicht die Schaltschwellen!)
+      TARGET_TEMP_MIN: '${TARGET_TEMP_MIN:-18}'
+      TARGET_TEMP_MAX: '${TARGET_TEMP_MAX:-22}'
+      TARGET_HUMIDITY_MIN: '${TARGET_HUMIDITY_MIN:-40}'
+      TARGET_HUMIDITY_MAX: '${TARGET_HUMIDITY_MAX:-60}'
     depends_on:
       mongodb:
         condition: service_healthy

@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 
 const temperatureCycleSchema = new mongoose.Schema({
+  // Welcher Plug hat diesen Zyklus ausgeloest (z.B. "heizung", "entfeuchter").
+  // Optional gehalten, damit alte Datensaetze ohne dieses Feld gueltig bleiben.
+  plug_id: {
+    type: String,
+    default: 'heizung',
+    index: true
+  },
   cycle_type: {
     type: String,
     enum: ['heating', 'cooling'],

@@ -4,21 +4,22 @@ import { requireApiKey } from '../middleware/apiKeyAuth.js';
 
 const router = express.Router();
 
-// GET /api/plug/desired - Für ESP32: "Was soll ich tun?"
-router.get('/desired', plugController.getDesiredState);
+// GET /api/plug - Für Website: Übersicht aller Plugs (Heizung, Entfeuchter, ...)
+router.get('/', plugController.getAllPlugs);
 
-// GET /api/plug/status - Für Website: Kompletter Status
-router.get('/status', plugController.getStatus);
+// GET /api/plug/:plugId/desired - Für ESP32: "Was soll ich tun?"
+router.get('/:plugId/desired', plugController.getDesiredState);
 
-// PUT /api/plug/desired - Für Website: Gewünschten Status setzen (schaltet die Heizung!)
-router.put('/desired', requireApiKey, plugController.setDesiredState);
+// GET /api/plug/:plugId/status - Für Website: Kompletter Status eines Plugs
+router.get('/:plugId/status', plugController.getStatus);
 
-// PUT /api/plug/mode - Für Website: Modus setzen (manual/auto)
-router.put('/mode', requireApiKey, plugController.setMode);
+// PUT /api/plug/:plugId/desired - Für Website: Gewünschten Status setzen (schaltet die Dose!)
+router.put('/:plugId/desired', requireApiKey, plugController.setDesiredState);
 
-// POST /api/plug/reported - Für ESP32: Aktuellen Status melden
-router.post('/reported', requireApiKey, plugController.updateReportedState);
+// PUT /api/plug/:plugId/mode - Für Website: Modus setzen (manual/auto)
+router.put('/:plugId/mode', requireApiKey, plugController.setMode);
+
+// POST /api/plug/:plugId/reported - Für ESP32: Aktuellen Status melden
+router.post('/:plugId/reported', requireApiKey, plugController.updateReportedState);
 
 export default router;
-
-
