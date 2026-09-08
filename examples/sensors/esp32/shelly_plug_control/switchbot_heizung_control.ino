@@ -20,18 +20,22 @@
 // ==================== KONFIGURATION ====================
 
 // WiFi Zugangsdaten
-const char* ssid = "EvjuCelle_Technik";
-const char* password = "hallodeniz";
+const char* ssid = "DEIN_WIFI_SSID";
+const char* password = "DEIN_WIFI_PASSWORT";
 
 // Eigene API (Temperatur-Monitoring)
-const char* apiUrl = "https://api.temperatur.evjucelle.de/api/sensors";
-const char* apiPlugDesired = "https://api.temperatur.evjucelle.de/api/plug/desired";
-const char* apiPlugReported = "https://api.temperatur.evjucelle.de/api/plug/reported";
+const char* apiUrl = "https://deine-api-domain.de/api/sensors";
+const char* apiPlugDesired = "https://deine-api-domain.de/api/plug/desired";
+const char* apiPlugReported = "https://deine-api-domain.de/api/plug/reported";
+
+// API-Key für geschützte Endpunkte (POST /sensors, POST /plug/reported)
+// Muss mit der API_KEY Umgebungsvariable des Backends übereinstimmen!
+const char* apiKey = "DEIN_API_KEY";
 
 // SwitchBot API
 const char* switchbotApiBase = "https://api.switch-bot.com/v1.1";
-const char* switchbotToken = "7214d65667fc6c202f4c4ebcf90360fff11de7570f1e73517e17e3ae256f07f0c5f35c9a1251468f3501a0ad39ff7869";
-const char* switchbotSecret = "6156f98fbb67e632ee6847744b974676";
+const char* switchbotToken = "DEIN_SWITCHBOT_TOKEN";
+const char* switchbotSecret = "DEIN_SWITCHBOT_SECRET";
 
 // NTP Server für Zeit-Synchronisation
 const char* ntpServer = "pool.ntp.org";
@@ -207,7 +211,8 @@ void sendDataToAPI(float temperatur, float luftfeuchtigkeit, float stromverbrauc
   HTTPClient http;
   http.begin(apiUrl);
   http.addHeader("Content-Type", "application/json");
-  
+  http.addHeader("X-API-Key", apiKey);
+
   // JSON erstellen
   StaticJsonDocument<256> doc;
   doc["temperatur"] = temperatur;
@@ -500,7 +505,8 @@ void reportStateToAPI(String state) {
   HTTPClient http;
   http.begin(apiPlugReported);
   http.addHeader("Content-Type", "application/json");
-  
+  http.addHeader("X-API-Key", apiKey);
+
   StaticJsonDocument<128> doc;
   doc["state"] = state;
   

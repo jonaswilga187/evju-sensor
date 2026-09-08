@@ -42,9 +42,10 @@ Ein vollständiges Monitoring-System, das:
 git clone https://github.com/dein-username/sensor-monitoring.git
 cd sensor-monitoring
 
-# 2. Umgebungsvariablen konfigurieren
+# 2. Docker Compose und Umgebungsvariablen aus den Vorlagen erstellen
+cp docker-compose.example.yml docker-compose.yml
 cp .env.example .env
-nano .env  # Passwörter ändern!
+nano .env  # Passwörter und API_KEY setzen!
 
 # 3. Alle Services starten
 docker compose up -d
@@ -73,12 +74,13 @@ npm run dev
 
 ```
 sensor-monitoring/
-├── frontend/          # React Dashboard (Port 3000)
-├── backend/           # Node.js API (Port 5000)
-├── docker/            # Docker Konfiguration
-├── docs/              # Dokumentation
-├── examples/          # Sensor-Beispiele (Python, ESP32)
-└── README.md          # Diese Datei
+├── frontend/                    # React Dashboard (Port 3000)
+├── backend/                     # Node.js API (Port 5000)
+├── docker-compose.example.yml   # Vorlage für lokales Docker-Setup
+├── docker-compose.coolify.yml   # Deployment-Setup für Coolify
+├── docs/                        # Dokumentation
+├── examples/                    # Sensor-Beispiele (Python, ESP32)
+└── README.md                    # Diese Datei
 ```
 
 ### Detaillierte Struktur
@@ -91,7 +93,8 @@ sensor-monitoring/
 │
 ├── 📄 README.md                    # Haupt-Dokumentation
 ├── 📄 .env.example                 # Umgebungsvariablen Template
-├── 📄 docker-compose.yml           # Docker Services
+├── 📄 docker-compose.example.yml   # Vorlage für lokales Docker-Setup
+├── 📄 docker-compose.coolify.yml   # Deployment-Setup für Coolify
 │
 ├── 📁 frontend/                    # React Dashboard
 │   ├── src/
@@ -116,7 +119,7 @@ sensor-monitoring/
 │   ├── 02-API.md                  # API Docs
 │   ├── 03-DEPLOYMENT.md           # Server Deployment
 │   ├── 04-DOCKER.md               # Docker Guide
-│   └── 05-SENSORS.md              # Sensor Integration
+│   └── 05-PLUG-CONTROL.md         # Sensor- & Heizungssteuerung (ESP32)
 │
 └── 📁 examples/                    # Beispiel-Code
     └── sensors/
@@ -154,7 +157,7 @@ sensor-monitoring/
 | [🔌 API Dokumentation](docs/02-API.md) | Alle API Endpoints |
 | [🚀 Deployment Guide](docs/03-DEPLOYMENT.md) | Server Deployment |
 | [🐳 Docker Guide](docs/04-DOCKER.md) | Docker & Compose |
-| [🌡️ Sensor Integration](docs/05-SENSORS.md) | Sensoren anbinden |
+| [🌡️ Heizungssteuerung](docs/05-PLUG-CONTROL.md) | Sensoren & Heizung anbinden |
 
 ## 🔧 Konfiguration
 
@@ -175,6 +178,9 @@ MONGO_DB_NAME=sensor_monitoring
 # API
 CORS_ORIGIN=https://yourdomain.com
 VITE_API_URL=https://api.yourdomain.com/api
+
+# API-Key für Heizungssteuerung & Sensor-Ingestion (z.B. mit `openssl rand -hex 32` erzeugen)
+API_KEY=
 ```
 
 ## 🌐 API Endpoints
@@ -193,11 +199,12 @@ POST /api/sensors              # Neuen Messwert erstellen
 
 ### Daten senden
 
-Dein Sensor sendet Daten per HTTP POST:
+Dein Sensor sendet Daten per HTTP POST (benötigt den `API_KEY` aus deiner `.env`):
 
 ```bash
 curl -X POST http://localhost:5000/api/sensors \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: dein-api-key" \
   -d '{
     "temperatur": 22.5,
     "luftfeuchtigkeit": 65,
@@ -210,7 +217,7 @@ curl -X POST http://localhost:5000/api/sensors \
 - 🐍 **Python** (Raspberry Pi) - [Siehe examples/sensors/python/](examples/sensors/python/)
 - 🔌 **ESP32** (Arduino) - [Siehe examples/sensors/esp32/](examples/sensors/esp32/)
 
-[Vollständige Sensor-Anleitung →](docs/05-SENSORS.md)
+[Vollständige Sensor- & Heizungs-Anleitung →](docs/05-PLUG-CONTROL.md)
 
 ## 🚀 Deployment
 
@@ -240,11 +247,14 @@ docker compose up -d --build
 ## 🔒 Sicherheit
 
 ✅ **HTTPS** - SSL via Let's Encrypt
-✅ **Authentication** - MongoDB mit Passwort
+✅ **MongoDB-Authentication** - Zugriff nur mit Passwort
+✅ **API-Key-Authentifizierung** - Schreib-Endpunkte (Heizungssteuerung, Sensor-Ingestion) erfordern `X-API-Key`
 ✅ **Rate Limiting** - DDoS Schutz
 ✅ **Security Headers** - Helmet.js
 ✅ **CORS** - Konfigurierbar
 ✅ **Input Validation** - Mongoose Validators
+
+> Lesende GET-Endpunkte (Dashboard-Anzeige) bleiben bewusst öffentlich zugänglich, da sie nur Monitoring-Daten liefern. Details siehe [docs/02-API.md](docs/02-API.md#-authentifizierung).
 
 ## 📊 Features
 

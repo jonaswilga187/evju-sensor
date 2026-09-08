@@ -25,6 +25,8 @@ services:
       NODE_ENV: production
       MONGODB_URI: 'mongodb://admin:${SERVICE_PASSWORD_MONGO}@mongodb:27017/sensor_monitoring?authSource=admin'
       CORS_ORIGIN: 'https://sensor.wilga.tech'
+      # API-Key für geschützte Schreib-Endpunkte (Heizungssteuerung, Sensor-Ingestion)
+      API_KEY: '${API_KEY}'
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 100
       # E-Mail-Benachrichtigungen (optional, siehe docs/07-EMAIL-BENACHRICHTIGUNGEN.md)

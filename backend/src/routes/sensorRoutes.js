@@ -1,5 +1,6 @@
 import express from 'express';
 import * as sensorController from '../controllers/sensorController.js';
+import { requireApiKey } from '../middleware/apiKeyAuth.js';
 
 const router = express.Router();
 
@@ -12,9 +13,9 @@ router.get('/range', sensorController.getDataByRange);
 router.get('/day', sensorController.getDataByDate);
 router.get('/stats', sensorController.getStats);
 
-// POST Routes
-router.post('/', sensorController.createMesswert);
-router.post('/bulk', sensorController.createBulkMesswerte);
+// POST Routes - nur mit gültigem API-Key (Sensor-Geräte)
+router.post('/', requireApiKey, sensorController.createMesswert);
+router.post('/bulk', requireApiKey, sensorController.createBulkMesswerte);
 
 export default router;
 

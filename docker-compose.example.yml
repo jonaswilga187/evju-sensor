@@ -34,6 +34,8 @@ services:
       NODE_ENV: ${NODE_ENV}
       MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB_NAME}?authSource=admin
       CORS_ORIGIN: ${CORS_ORIGIN}
+      # API-Key für geschützte Schreib-Endpunkte (Heizungssteuerung, Sensor-Ingestion)
+      API_KEY: ${API_KEY}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
       # E-Mail-Benachrichtigungen
@@ -114,4 +116,3 @@ volumes:
     driver: local
   nginx_letsencrypt:
     driver: local
-
