@@ -70,6 +70,7 @@ const metricUnit = (metric) => (metric === 'temperature' ? '°C' : '%');
 const assertKnownPlug = (plugId) => {
   if (!PLUG_DEFINITIONS[plugId]) {
     const err = new Error(`Unbekannte Plug-ID: "${plugId}". Bekannt: ${Object.keys(PLUG_DEFINITIONS).join(', ')}`);
+    err.status = 404;
     err.statusCode = 404;
     throw err;
   }

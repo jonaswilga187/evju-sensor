@@ -85,6 +85,7 @@ plugControlSchema.statics.getStatus = async function(plugId) {
   const status = await this.findById(plugId);
   if (!status) {
     const err = new Error(`Unbekannte Plug-ID: "${plugId}"`);
+    err.status = 404;
     err.statusCode = 404;
     throw err;
   }
