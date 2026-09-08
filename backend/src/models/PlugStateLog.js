@@ -23,8 +23,7 @@ const plugStateLogSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     required: true,
-    default: Date.now,
-    index: true
+    default: Date.now
   }
 }, {
   collection: 'plug_state_log'
@@ -33,6 +32,7 @@ const plugStateLogSchema = new mongoose.Schema({
 plugStateLogSchema.index({ timestamp: -1 });
 
 // TTL: Rohdaten nach 180 Tagen aufräumen (Analyse aggregiert vorher)
+// Deckt gleichzeitig den aufsteigenden Index auf "timestamp" ab.
 plugStateLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 15552000 });
 
 // Aktuellsten Log-Eintrag pro Plug VOR einem gegebenen Zeitpunkt holen -
