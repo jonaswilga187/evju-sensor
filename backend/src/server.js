@@ -16,6 +16,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Hinter Reverse Proxy (z. B. Nginx Proxy Manager) echte Client-IP vertrauen
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Datenbank verbinden
 connectDB();
 

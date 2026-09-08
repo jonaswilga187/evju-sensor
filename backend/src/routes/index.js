@@ -2,6 +2,7 @@ import express from 'express';
 import sensorRoutes from './sensorRoutes.js';
 import plugRoutes from './plugRoutes.js';
 import cycleRoutes from './cycleRoutes.js';
+import weatherRoutes from './weatherRoutes.js';
 
 const router = express.Router();
 
@@ -13,9 +14,20 @@ router.get('/', (req, res) => {
     endpoints: {
       sensors: '/api/sensors',
       plug: '/api/plug',
+      weather: '/api/weather',
       cycles: '/api/cycles',
       health: '/health'
     }
+  });
+});
+
+// API Health (für Frontend-Statusanzeige)
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
@@ -23,6 +35,7 @@ router.get('/', (req, res) => {
 router.use('/sensors', sensorRoutes);
 router.use('/plug', plugRoutes);
 router.use('/cycles', cycleRoutes);
+router.use('/weather', weatherRoutes);
 
 export default router;
 

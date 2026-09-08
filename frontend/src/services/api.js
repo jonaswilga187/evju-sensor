@@ -298,26 +298,46 @@ export const weatherAPI = {
    */
   async get24HourTemperature(latitude = 52.62, longitude = 10.08) {
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m&past_days=1&timezone=Europe/Berlin`;
+      const url = `${API_BASE_URL}/weather/24h?latitude=${latitude}&longitude=${longitude}`;
       const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
-      
-      // Daten formatieren: Array von {time, temperature}
-      if (data.hourly && data.hourly.time && data.hourly.temperature_2m) {
-        return data.hourly.time.map((time, index) => ({
-          time: time,
-          temperature: data.hourly.temperature_2m[index]
-        }));
+      const result = await response.json();
+
+      // Datenformat aus eigenem Backend erwarten
+      if (result.success && Array.isArray(result.data)) {
+        return result.data;
       }
       
-      throw new Error('Ungültiges Datenformat von Open-Meteo API');
+      throw new Error('Ungültiges Datenformat von Weather API');
     } catch (error) {
       console.error('Fehler beim Abrufen der Wetterdaten:', error);
+      throw error;
+    }
+  },
+};
+
+/**
+ * System API Service
+ * Health/Status-Endpunkte
+ */
+export const systemAPI = {
+  /**
+   * Backend Health prüfen
+   * @returns {Promise<Object>} Health-Objekt
+   */
+  async getHealth() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Fehler beim Abrufen des Backend-Health:', error);
       throw error;
     }
   },

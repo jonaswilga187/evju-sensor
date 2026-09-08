@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { sensorAPI, weatherAPI } from './services/api'
+import { sensorAPI, systemAPI } from './services/api'
 import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
 import TemperatureCycles from './TemperatureCycles'
@@ -65,6 +65,11 @@ function App() {
   const [averages, setAverages] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [systemStatus, setSystemStatus] = useState({
+    backendOnline: false,
+    sensorFreshness: 'offline',
+    lastSensorTimestamp: null
+  })
   
   // Daten von API laden
   useEffect(() => {
@@ -73,17 +78,13 @@ function App() {
         setLoading(true)
         setError(null)
 
-        // Parallel alle API-Aufrufe (Sensordaten, Durchschnitte, Wetterdaten)
-        const [chartData, avgData, weatherData] = await Promise.all([
+        // Parallel alle API-Aufrufe (Sensordaten, Durchschnitte)
+        const [chartData, avgData, latestData, healthData] = await Promise.all([
           sensorAPI.get24HourData(),
           sensorAPI.getAverages(),
-          weatherAPI.get24HourTemperature().catch(err => {
-            console.warn('Wetterdaten konnten nicht geladen werden:', err)
-            return null
-          })
+          sensorAPI.getLatest().catch(() => null),
+          systemAPI.getHealth().catch(() => null)
         ])
-
-        console.log('Wetterdaten geladen:', weatherData?.length || 0, 'Einträge')
 
         // Zeitstempel formatieren und kumulativen kWh-Wert berechnen
         let kwhAkkumulator = 0
@@ -99,64 +100,6 @@ function App() {
             kwhAkkumulator += (avgWatt / 1000) * hoursDiff
           }
           
-          // Außentemperatur für diesen Zeitpunkt finden (passend zu DB-Timestamps)
-          let außentemperatur = null
-          if (weatherData && weatherData.length > 0) {
-            const sensorTime = new Date(item.zeitstempel)
-            
-            // Sortiere Wetterdaten nach Zeit
-            const sortedWeather = [...weatherData].sort((a, b) => 
-              new Date(a.time) - new Date(b.time)
-            )
-            
-            // Finde exakten Match oder nächste Punkte für Interpolation
-            const exactMatch = sortedWeather.find(w => {
-              const weatherTime = new Date(w.time)
-              return Math.abs(sensorTime - weatherTime) < 1000 // Exakt gleich (1 Sekunde Toleranz)
-            })
-            
-            if (exactMatch) {
-              außentemperatur = exactMatch.temperature
-            } else {
-              // Finde die beiden nächsten Punkte für lineare Interpolation
-              let before = null
-              let after = null
-              
-              for (let i = 0; i < sortedWeather.length; i++) {
-                const weatherTime = new Date(sortedWeather[i].time)
-                if (weatherTime <= sensorTime) {
-                  before = sortedWeather[i]
-                } else if (weatherTime > sensorTime && !after) {
-                  after = sortedWeather[i]
-                  break
-                }
-              }
-              
-              // Interpolation wenn beide Punkte vorhanden
-              if (before && after) {
-                const beforeTime = new Date(before.time).getTime()
-                const afterTime = new Date(after.time).getTime()
-                const sensorTimeMs = sensorTime.getTime()
-                
-                // Lineare Interpolation
-                const ratio = (sensorTimeMs - beforeTime) / (afterTime - beforeTime)
-                außentemperatur = before.temperature + (after.temperature - before.temperature) * ratio
-              } else if (before) {
-                // Nur Punkt davor vorhanden (maximal 2 Stunden Unterschied)
-                const diffHours = Math.abs((sensorTime - new Date(before.time)) / (1000 * 60 * 60))
-                if (diffHours <= 2) {
-                  außentemperatur = before.temperature
-                }
-              } else if (after) {
-                // Nur Punkt danach vorhanden (maximal 2 Stunden Unterschied)
-                const diffHours = Math.abs((new Date(after.time) - sensorTime) / (1000 * 60 * 60))
-                if (diffHours <= 2) {
-                  außentemperatur = after.temperature
-                }
-              }
-            }
-          }
-          
           return {
             zeit: new Date(item.zeitstempel).toLocaleTimeString('de-DE', { 
               hour: '2-digit', 
@@ -165,22 +108,35 @@ function App() {
             temperatur: item.temperatur,
             feuchtigkeit: item.luftfeuchtigkeit,
             stromverbrauch: item.stromverbrauch,
-            kwh_kumulativ: parseFloat(kwhAkkumulator.toFixed(2)),
-            außentemperatur: außentemperatur !== null ? parseFloat(außentemperatur.toFixed(1)) : null
+            kwh_kumulativ: parseFloat(kwhAkkumulator.toFixed(2))
           }
         })
 
-        // Debug: Prüfe ob Außentemperatur-Daten vorhanden sind
-        const dataWithTemp = formattedData.filter(d => d.außentemperatur !== null)
-        console.log('Daten mit Außentemperatur:', dataWithTemp.length, 'von', formattedData.length)
-
         setData(formattedData)
         setAverages(avgData)
+        const lastTs = latestData?.zeitstempel || null
+        const ageMinutes = lastTs ? (Date.now() - new Date(lastTs).getTime()) / (1000 * 60) : Number.POSITIVE_INFINITY
+        let freshness = 'offline'
+        if (Number.isFinite(ageMinutes)) {
+          if (ageMinutes <= 5) freshness = 'fresh'
+          else if (ageMinutes <= 15) freshness = 'stale'
+          else freshness = 'offline'
+        }
+        setSystemStatus({
+          backendOnline: Boolean(healthData?.success),
+          sensorFreshness: freshness,
+          lastSensorTimestamp: lastTs
+        })
         
       } catch (err) {
         console.error('Fehler beim Laden der Daten:', err)
         setError('Daten konnten nicht geladen werden. Verwende Beispieldaten.')
         setData(fallbackData)
+        setSystemStatus(prev => ({
+          ...prev,
+          backendOnline: false,
+          sensorFreshness: 'offline'
+        }))
       } finally {
         setLoading(false)
       }
@@ -258,6 +214,38 @@ function App() {
                 <p className="text-sm text-yellow-800">⚠️ {error}</p>
               </div>
             )}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Backend</p>
+                <p className={`text-sm font-semibold ${systemStatus.backendOnline ? 'text-green-700' : 'text-red-700'}`}>
+                  {systemStatus.backendOnline ? 'Erreichbar' : 'Nicht erreichbar'}
+                </p>
+              </div>
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Temperatur-Sensor</p>
+                <p className={`text-sm font-semibold ${
+                  systemStatus.sensorFreshness === 'fresh'
+                    ? 'text-green-700'
+                    : systemStatus.sensorFreshness === 'stale'
+                    ? 'text-yellow-700'
+                    : 'text-red-700'
+                }`}>
+                  {systemStatus.sensorFreshness === 'fresh'
+                    ? 'Online (< 5 min)'
+                    : systemStatus.sensorFreshness === 'stale'
+                    ? 'Verzögert (5-15 min)'
+                    : 'Offline (> 15 min)'}
+                </p>
+              </div>
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Letzter Messwert</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {systemStatus.lastSensorTimestamp
+                    ? new Date(systemStatus.lastSensorTimestamp).toLocaleString('de-DE')
+                    : 'Unbekannt'}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Stats Cards */}
@@ -372,10 +360,7 @@ function App() {
                 <Tooltip content={<CustomTooltip />} />
                 <Legend 
                   wrapperStyle={{ paddingTop: '20px' }}
-                  formatter={(value) => {
-                    if (value === 'außentemperatur') return 'Außentemperatur'
-                    return value.charAt(0).toUpperCase() + value.slice(1)
-                  }}
+                  formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
                 />
                 <Area
                   type="monotone"
@@ -386,16 +371,6 @@ function App() {
                   fill="url(#colorTemperatur)"
                   name="temperatur"
                   yAxisId="left"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="außentemperatur"
-                  stroke="#6b7280"
-                  strokeWidth={1.5}
-                  dot={{ fill: '#6b7280', r: 2 }}
-                  name="außentemperatur"
-                  yAxisId="left"
-                  connectNulls={true}
                 />
                 <Area
                   type="monotone"
