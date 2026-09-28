@@ -28,7 +28,9 @@ services:
       # API-Key für geschützte Schreib-Endpunkte (Heizungssteuerung, Sensor-Ingestion)
       API_KEY: '${API_KEY}'
       RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
+      # War 100 - reicht nicht: allein der ESP32 pollt 2 Plugs alle 5s (~24
+      # Anfragen/Minute), dazu Sensor-/Config-Poll + das Dashboard selbst.
+      RATE_LIMIT_MAX_REQUESTS: 3000
       # E-Mail-Benachrichtigungen (optional, siehe docs/07-EMAIL-BENACHRICHTIGUNGEN.md)
       EMAIL_SERVICE: '${EMAIL_SERVICE:-}'
       SMTP_HOST: '${SMTP_HOST:-}'
