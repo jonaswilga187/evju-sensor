@@ -330,34 +330,6 @@ function App() {
             </div>
           </div>
 
-          {/* API-Key für Schreibzugriffe (Heizung/Entfeuchter schalten) */}
-          <ApiKeySettings />
-
-          {/* Heizung & Entfeuchter Steuerung - die Kernfunktion der App, deshalb
-              weit oben statt hinter den Charts und Einstellungs-Panels */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-            <PlugControl
-              plugId="heizung"
-              title="Heizung"
-              direction="below"
-              unit="°C"
-              min={5}
-              max={30}
-              step={0.5}
-              icon="🔥"
-            />
-            <PlugControl
-              plugId="entfeuchter"
-              title="Luftentfeuchter"
-              direction="above"
-              unit="%"
-              min={0}
-              max={100}
-              step={1}
-              icon="💧"
-            />
-          </div>
-
           {/* Temperatur & Feuchtigkeit Chart */}
           <div className="bg-gray-50 rounded-xl p-6 mb-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-6">
@@ -514,6 +486,33 @@ function App() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* API-Key für Schreibzugriffe (Heizung/Entfeuchter schalten) */}
+          <ApiKeySettings />
+
+          {/* Heizung & Entfeuchter Steuerung */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+            <PlugControl
+              plugId="heizung"
+              title="Heizung"
+              direction="below"
+              unit="°C"
+              min={5}
+              max={30}
+              step={0.5}
+              icon="🔥"
+            />
+            <PlugControl
+              plugId="entfeuchter"
+              title="Luftentfeuchter"
+              direction="above"
+              unit="%"
+              min={0}
+              max={100}
+              step={1}
+              icon="💧"
+            />
           </div>
 
           {/* Erweiterte Einstellungen: seltener gebraucht, deshalb unten */}
