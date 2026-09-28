@@ -16,6 +16,20 @@
  * Namen aus SWITCHBOT_DEVICE_NAME_HEIZUNG / _ENTFEUCHTER (unten) benannt sein,
  * damit dieser Sketch sie automatisch per Namen findet (keine Device-IDs
  * hardcoden nötig).
+ *
+ * WLAN-Fernkonfiguration: Der ESP32 fragt regelmäßig /api/device/:id/config
+ * ab. Ändern sich dort die WLAN-Zugangsdaten (über das Dashboard), speichert
+ * er sie nur als "pending" im Flash (NVS) - probiert sie aber erst beim
+ * nächsten Neustart aus, damit ein Update die laufende Verbindung am
+ * aktuellen Standort nicht sofort kappt (z.B. während er noch zuhause hängt,
+ * aber schon die Zugangsdaten fürs Veranstaltungs-WLAN bereitliegen).
+ * Schlägt der Verbindungsversuch mit neuen Daten fehl, fällt das Gerät
+ * automatisch auf die zuletzt bekannten funktionierenden Daten zurück.
+ * Funktioniert auch das nicht mehr, öffnet es einen kurzzeitigen
+ * Konfigurations-Access-Point ("ESP32-Sensor-Setup") für die manuelle
+ * Einrichtung per Handy.
+ *
+ * Benötigte zusätzliche Bibliothek (Library Manager): "WiFiManager" von tzapu.
  */
 
 #include <WiFi.h>
@@ -25,6 +39,8 @@
 #include <mbedtls/md.h>
 #include <mbedtls/base64.h>
 #include <time.h>
+#include <Preferences.h>
+#include <WiFiManager.h>
 
 // ==================== KONFIGURATION ====================
 
@@ -48,6 +64,10 @@ const char* switchbotSecret = "DEIN_SWITCHBOT_SECRET";
 const char* SWITCHBOT_DEVICE_NAME_HEIZUNG = "Heizung";
 const char* SWITCHBOT_DEVICE_NAME_ENTFEUCHTER = "Entfeuchter";
 
+// Eindeutige Geräte-ID für die WLAN-Fernkonfiguration - muss mit der DEVICE_ID
+// in frontend/src/DeviceWifiConfig.jsx übereinstimmen.
+const char* DEVICE_ID = "esp32-main";
+
 // NTP Server für Zeit-Synchronisation
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 3600;      // GMT+1 (Deutschland)
@@ -61,6 +81,8 @@ DHT dht(DHTPIN, DHTTYPE);
 // Timing (in Millisekunden)
 const unsigned long SENSOR_INTERVAL = 60000;     // 1 Minute für Sensordaten
 const unsigned long PLUG_CHECK_INTERVAL = 5000;  // 5 Sekunden für Plug-Status (nur eigene API!)
+const unsigned long CONFIG_CHECK_INTERVAL = 60000;  // 1 Minute für WLAN-Config-Poll
+const unsigned long WIFI_CONNECT_TIMEOUT = 15000;   // 15 Sekunden pro Verbindungsversuch
 
 // ==================== PLUG-STRUKTUR ====================
 
@@ -80,6 +102,16 @@ Plug plugs[2] = {
 
 unsigned long lastSensorRead = 0;
 unsigned long lastPlugCheck = 0;
+unsigned long lastConfigCheck = 0;
+
+// WLAN-Fernkonfiguration: aktuell aktive (zuletzt funktionierende) und ggf.
+// wartende neue Zugangsdaten, persistiert in Preferences (NVS).
+Preferences prefs;
+String activeSsid, activePass;
+long activeVersion = 0;
+bool hasPending = false;
+String pendingSsid, pendingPass;
+long pendingVersion = 0;
 
 // ==================== SETUP ====================
 
@@ -157,31 +189,213 @@ void loop() {
     }
   }
 
+  // 3. WLAN-Fernkonfiguration prüfen (alle 60 Sekunden)
+  if (currentMillis - lastConfigCheck >= CONFIG_CHECK_INTERVAL) {
+    lastConfigCheck = currentMillis;
+    checkForConfigUpdate();
+  }
+
   delay(100);
 }
 
 // ==================== WIFI FUNKTIONEN ====================
 
-void connectWiFi() {
-  Serial.print("📡 Verbinde mit WiFi: ");
-  Serial.println(ssid);
+// Lädt die zuletzt gespeicherten WLAN-Zugangsdaten aus dem Flash (NVS). Ist
+// dort noch nichts hinterlegt (allererster Start), werden die oben fest im
+// Code stehenden Zugangsdaten als Ausgangspunkt übernommen.
+void loadWifiCredentials() {
+  prefs.begin("wificfg", false);
+  activeSsid = prefs.getString("active_ssid", "");
+  activePass = prefs.getString("active_pass", "");
+  activeVersion = prefs.getLong("active_ver", 0);
+  pendingVersion = prefs.getLong("pending_ver", 0);
+  if (pendingVersion > activeVersion) {
+    pendingSsid = prefs.getString("pending_ssid", "");
+    pendingPass = prefs.getString("pending_pass", "");
+    hasPending = pendingSsid.length() > 0;
+  }
+  prefs.end();
 
-  WiFi.begin(ssid, password);
+  if (activeSsid.length() == 0) {
+    saveActiveCredentials(String(ssid), String(password), 0);
+  }
+}
 
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
+void saveActiveCredentials(const String &newSsid, const String &newPass, long version) {
+  prefs.begin("wificfg", false);
+  prefs.putString("active_ssid", newSsid);
+  prefs.putString("active_pass", newPass);
+  prefs.putLong("active_ver", version);
+  prefs.end();
+  activeSsid = newSsid;
+  activePass = newPass;
+  activeVersion = version;
+}
+
+void savePendingCredentials(const String &newSsid, const String &newPass, long version) {
+  prefs.begin("wificfg", false);
+  prefs.putString("pending_ssid", newSsid);
+  prefs.putString("pending_pass", newPass);
+  prefs.putLong("pending_ver", version);
+  prefs.end();
+  pendingSsid = newSsid;
+  pendingPass = newPass;
+  pendingVersion = version;
+  hasPending = true;
+}
+
+void clearPendingCredentials() {
+  prefs.begin("wificfg", false);
+  prefs.putLong("pending_ver", activeVersion);  // <= activeVersion => gilt nicht mehr als "pending"
+  prefs.end();
+  hasPending = false;
+}
+
+// Ein einzelner Verbindungsversuch mit Timeout (WiFi.begin allein würde sonst
+// endlos hängen bleiben, falls die Zugangsdaten falsch sind).
+bool tryConnect(const String &s, const String &p, unsigned long timeoutMs) {
+  if (s.length() == 0) return false;
+  Serial.printf("📡 Verbinde mit WLAN: %s\n", s.c_str());
+  WiFi.begin(s.c_str(), p.c_str());
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) {
+    delay(400);
     Serial.print(".");
-    attempts++;
+  }
+  Serial.println();
+  return WiFi.status() == WL_CONNECTED;
+}
+
+// Robuster Verbindungsaufbau: zuerst evtl. hinterlegte neue ("pending")
+// Zugangsdaten probieren, bei Fehlschlag zurück auf die zuletzt bekannt
+// funktionierenden. Klappt auch das nicht, übernimmt startConfigPortal().
+void connectWiFi() {
+  loadWifiCredentials();
+
+  bool pendingJustTried = false;
+  bool pendingSucceeded = false;
+
+  if (hasPending) {
+    Serial.println("🆕 Neue WLAN-Zugangsdaten hinterlegt - probiere sie zuerst...");
+    pendingJustTried = true;
+    if (tryConnect(pendingSsid, pendingPass, WIFI_CONNECT_TIMEOUT)) {
+      Serial.println("✅ Neue WLAN-Zugangsdaten funktionieren! Werden übernommen.");
+      saveActiveCredentials(pendingSsid, pendingPass, pendingVersion);
+      clearPendingCredentials();
+      pendingSucceeded = true;
+    } else {
+      Serial.println("❌ Neue WLAN-Zugangsdaten fehlgeschlagen - falle zurück...");
+      WiFi.disconnect(true);
+      delay(200);
+    }
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    if (!tryConnect(activeSsid, activePass, WIFI_CONNECT_TIMEOUT)) {
+      Serial.println("❌ Auch die zuletzt bekannten WLAN-Zugangsdaten funktionieren nicht!");
+      startConfigPortal();  // blockiert, bis eine Verbindung zustande kam
+      pendingJustTried = false;  // startConfigPortal hat activeCredentials ggf. bereits neu gesetzt
+    }
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ WiFi verbunden!");
+    Serial.println("✅ WiFi verbunden!");
     Serial.print("📍 IP Adresse: ");
     Serial.println(WiFi.localIP());
+
+    // Ergebnis eines gerade probierten "pending"-Versuchs zurückmelden, damit
+    // das Dashboard weiß, ob die neuen Daten übernommen wurden.
+    if (pendingJustTried) {
+      reportConfigAck(pendingVersion, pendingSucceeded ? "applied" : "failed");
+    }
   } else {
-    Serial.println("\n❌ WiFi Verbindung fehlgeschlagen!");
+    Serial.println("❌ WiFi Verbindung fehlgeschlagen!");
   }
+}
+
+// Letzter Ausweg: öffnet einen Access Point ("ESP32-Sensor-Setup"), über den
+// man sich per Handy verbindet und neue WLAN-Zugangsdaten per Web-Formular
+// eingibt. Blockiert, bis eine Verbindung zustande kommt oder der Timeout
+// abläuft (dann Neustart, um es von vorn zu versuchen).
+void startConfigPortal() {
+  Serial.println("📶 Öffne Konfigurations-Access-Point 'ESP32-Sensor-Setup'...");
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(300);  // 5 Minuten
+  bool connected = wm.startConfigPortal("ESP32-Sensor-Setup");
+  if (connected) {
+    Serial.println("✅ Über Konfigurations-Portal verbunden!");
+    saveActiveCredentials(WiFi.SSID(), WiFi.psk(), activeVersion);
+  } else {
+    Serial.println("❌ Konfigurations-Portal ohne Erfolg beendet - Neustart...");
+    delay(1000);
+    ESP.restart();
+  }
+}
+
+void reportConfigAck(long version, const String &status) {
+  HTTPClient http;
+  http.begin(String(apiBaseUrl) + "/device/" + DEVICE_ID + "/config/ack");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-API-Key", apiKey);
+
+  StaticJsonDocument<128> doc;
+  doc["version"] = version;
+  doc["status"] = status;
+
+  String jsonString;
+  serializeJson(doc, jsonString);
+  int httpCode = http.POST(jsonString);
+
+  if (httpCode == 200) {
+    Serial.printf("✅ Config-Version %ld als \"%s\" gemeldet\n", version, status.c_str());
+  } else {
+    Serial.printf("⚠️  Konnte Config-Ack nicht senden: %d\n", httpCode);
+  }
+
+  http.end();
+}
+
+// Fragt regelmäßig, ob am Dashboard neue WLAN-Zugangsdaten hinterlegt wurden.
+// Verbindet sich NICHT sofort um - speichert sie nur als "pending" für den
+// nächsten Neustart (siehe connectWiFi()), damit die laufende Verbindung am
+// aktuellen Standort nicht sofort gekappt wird.
+void checkForConfigUpdate() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(String(apiBaseUrl) + "/device/" + DEVICE_ID + "/config");
+  http.addHeader("X-API-Key", apiKey);
+
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (!error) {
+      long serverVersion = doc["data"]["version"] | 0;
+      long knownVersion = hasPending ? pendingVersion : activeVersion;
+
+      if (serverVersion > knownVersion) {
+        String newSsid = doc["data"]["wifi_ssid"] | "";
+        String newPass = doc["data"]["wifi_password"] | "";
+        if (newSsid.length() > 0) {
+          Serial.printf("🆕 Neue WLAN-Config gefunden (Version %ld): %s\n", serverVersion, newSsid.c_str());
+          savePendingCredentials(newSsid, newPass, serverVersion);
+          Serial.println("   Wird erst beim nächsten Neustart des Geräts probiert.");
+        }
+      }
+    } else {
+      Serial.printf("❌ [Config-Check] JSON Parse Fehler: %s\n", error.c_str());
+    }
+  } else if (httpCode == 401) {
+    Serial.println("❌ [Config-Check] 401 Unauthorized - API_KEY prüfen!");
+  } else {
+    Serial.printf("⚠️  [Config-Check] HTTP Fehler: %d\n", httpCode);
+  }
+
+  http.end();
 }
 
 // ==================== SENSOR FUNKTIONEN ====================

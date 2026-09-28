@@ -559,5 +559,46 @@ export const experimentAPI = {
   },
 };
 
+/**
+ * Device Config API Service
+ * Fernkonfiguration für den ESP32 (aktuell nur WLAN-Zugangsdaten). Der ESP32
+ * holt sich neue Werte selbst per Poll ab (siehe docs/05-PLUG-CONTROL.md),
+ * hier wird nur die gewünschte Konfiguration hinterlegt und der zuletzt vom
+ * Gerät bestätigte Stand angezeigt.
+ */
+export const deviceAPI = {
+  async getConfigStatus(deviceId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/device/${deviceId}/config/status`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`Fehler beim Abrufen des Config-Status (${deviceId}):`, error);
+      throw error;
+    }
+  },
+
+  async setWifiConfig(deviceId, wifiSsid, wifiPassword) {
+    try {
+      const response = await authorizedFetch(`${API_BASE_URL}/device/${deviceId}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wifi_ssid: wifiSsid, wifi_password: wifiPassword }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.message || `HTTP error! status: ${response.status}`);
+      }
+      return body.data;
+    } catch (error) {
+      console.error(`Fehler beim Setzen der WLAN-Config (${deviceId}):`, error);
+      throw error;
+    }
+  },
+};
+
 export default sensorAPI;
 

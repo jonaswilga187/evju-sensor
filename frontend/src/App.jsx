@@ -7,6 +7,7 @@ import TemperatureCycles from './TemperatureCycles'
 import ApiKeySettings from './ApiKeySettings'
 import ConsumptionAnalysis from './ConsumptionAnalysis'
 import ExperimentControl from './ExperimentControl'
+import DeviceWifiConfig from './DeviceWifiConfig'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
@@ -489,6 +490,9 @@ function App() {
 
           {/* Testwoche: automatisierte Experiment-Sequenz für die Verbrauchsanalyse */}
           <ExperimentControl />
+
+          {/* WLAN-Fernkonfiguration für den ESP32 */}
+          <DeviceWifiConfig />
 
           {/* Heizung & Entfeuchter Steuerung */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">

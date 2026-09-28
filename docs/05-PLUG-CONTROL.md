@@ -201,6 +201,35 @@ keine manuelle ID-Konfiguration nötig.
 > aktuell **nicht genutztes** Beispiel für eine rein lokale Shelly-Steuerung
 > (kein Cloud-Umweg). Falls nicht gebraucht, kann sie entfernt werden.
 
+### WLAN-Fernkonfiguration
+
+Der ESP32 pollt zusätzlich `GET /api/device/:deviceId/config` (dieselbe
+`DEVICE_ID` wie in `frontend/src/DeviceWifiConfig.jsx`, aktuell
+`"esp32-main"`). Über das Dashboard hinterlegte neue WLAN-Zugangsdaten werden
+dort als "pending" im Flash (NVS, `Preferences`-Bibliothek) gespeichert -
+**nicht sofort verbunden**, sondern erst beim nächsten Neustart des Geräts
+probiert. Der gedachte Ablauf für einen Standortwechsel:
+
+1. Neue Zugangsdaten (z. B. fürs Veranstaltungs-WLAN) im Dashboard eintragen,
+   **während der ESP32 noch am alten Standort mit funktionierendem WLAN läuft**.
+2. Der ESP32 holt sie beim nächsten Poll ab und speichert sie nur - die
+   laufende Verbindung bleibt unangetastet.
+3. Gerät physisch zum neuen Standort bringen, neu booten: es probiert zuerst
+   die neuen ("pending") Daten. Klappt das, werden sie zu den aktiven Daten.
+4. Schlägt der Verbindungsversuch fehl (falsches Passwort, WLAN nicht in
+   Reichweite o.ä.), fällt das Gerät automatisch auf die zuletzt bekannt
+   funktionierenden Zugangsdaten zurück.
+5. Funktioniert auch das nicht mehr, öffnet der ESP32 einen
+   Konfigurations-Access-Point (`ESP32-Sensor-Setup`, via der
+   [WiFiManager-Bibliothek](https://github.com/tzapu/WiFiManager) von tzapu -
+   im Arduino Library Manager installierbar) für 5 Minuten, über den man sich
+   per Handy verbindet und neue Zugangsdaten per Web-Formular eingibt.
+
+Jeder Verbindungsversuch mit neuen ("pending") Daten wird per
+`POST /api/device/:deviceId/config/ack` ans Backend zurückgemeldet
+(`status: "applied"` oder `"failed"`) - im Dashboard unter der
+WLAN-Fernkonfiguration einsehbar.
+
 ## Sicherheit
 
 Alle Endpunkte, die einen Plug-Status ändern oder Sensordaten einspielen
@@ -211,6 +240,12 @@ sind über einen gemeinsamen API-Key geschützt (`X-API-Key` Header, siehe
 `401 Unauthorized`. `GET /api/plug/:plugId/desired` (ESP32 fragt Sollwert ab)
 und `GET /api/plug/:plugId/status` bzw. `GET /api/plug` (Website liest Status)
 sind bewusst ungeschützt (nur lesend).
+
+`GET /api/device/:deviceId/config` und `PUT /api/device/:deviceId/config`
+sind ebenfalls über den API-Key geschützt - anders als bei den Plugs, weil
+hier ein echtes WLAN-Passwort im Klartext übertragen wird.
+`GET /api/device/:deviceId/config/status` (für die Website, ohne Passwort im
+Response) ist bewusst ungeschützt.
 
 ## Troubleshooting
 

@@ -5,6 +5,7 @@ import cycleRoutes from './cycleRoutes.js';
 import weatherRoutes from './weatherRoutes.js';
 import analysisRoutes from './analysisRoutes.js';
 import experimentRoutes from './experimentRoutes.js';
+import deviceRoutes from './deviceRoutes.js';
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.use('/cycles', cycleRoutes);
 router.use('/weather', weatherRoutes);
 router.use('/analysis', analysisRoutes);
 router.use('/experiment', experimentRoutes);
+router.use('/device', deviceRoutes);
 
 export default router;
 
