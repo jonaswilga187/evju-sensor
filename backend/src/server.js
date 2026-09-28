@@ -10,6 +10,7 @@ import routes from './routes/index.js';
 import { checkVerbrauchAlarm } from './services/verbrauchAlarmService.js';
 import { initPlugs } from './services/plugService.js';
 import { advanceIfNeeded as advanceExperimentIfNeeded } from './services/experimentService.js';
+import { aggregateOldData } from './services/dataRetentionService.js';
 
 // Umgebungsvariablen laden
 dotenv.config();
@@ -70,6 +71,7 @@ app.listen(PORT, () => {
   setTimeout(() => {
     checkVerbrauchAlarm();
     initPlugs().catch((err) => console.error('❌ Fehler beim Anlegen der Plugs:', err));
+    aggregateOldData().catch((err) => console.error('❌ Fehler bei der Tages-Zusammenfassung:', err));
   }, 10000); // 10 Sekunden nach Start
   
   // Regelmäßig prüfen
@@ -82,6 +84,13 @@ app.listen(PORT, () => {
   setInterval(() => {
     advanceExperimentIfNeeded().catch((err) => console.error('❌ Fehler im Experiment-Check:', err));
   }, 15000);
+
+  // Tages-Zusammenfassungen nachziehen, bevor Rohdaten nach 30 Tagen per
+  // TTL-Index gelöscht werden (siehe dataRetentionService.js) - alle 6h
+  // reicht, überspringt ohnehin bereits erledigte Tage.
+  setInterval(() => {
+    aggregateOldData().catch((err) => console.error('❌ Fehler bei der Tages-Zusammenfassung:', err));
+  }, 6 * 60 * 60 * 1000);
 });
 
 export default app;

@@ -12,6 +12,7 @@ router.get('/hourly', sensorController.getHourlyData);
 router.get('/range', sensorController.getDataByRange);
 router.get('/day', sensorController.getDataByDate);
 router.get('/stats', sensorController.getStats);
+router.get('/daily-summary', sensorController.getDailySummaries);
 
 // POST Routes - nur mit gültigem API-Key (Sensor-Geräte)
 router.post('/', requireApiKey, sensorController.createMesswert);

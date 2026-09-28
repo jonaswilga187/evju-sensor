@@ -8,6 +8,7 @@ import ApiKeySettings from './ApiKeySettings'
 import ConsumptionAnalysis from './ConsumptionAnalysis'
 import ExperimentControl from './ExperimentControl'
 import DeviceWifiConfig from './DeviceWifiConfig'
+import LongTermHistory from './LongTermHistory'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
@@ -79,9 +80,10 @@ function App() {
     lastSensorTimestamp: null
   })
   
-  // Daten von API laden
-  useEffect(() => {
-    const fetchData = async () => {
+  // Daten von API laden (auch vom "Aktualisieren"-Button wiederverwendet,
+  // statt eines vollen Seiten-Reloads, der z.B. ein halb eingetipptes
+  // Feld verwerfen würde - der Auto-Refresh alle 30s macht dasselbe schon).
+  const fetchData = React.useCallback(async () => {
       try {
         setLoading(true)
         setError(null)
@@ -153,8 +155,9 @@ function App() {
       } finally {
         setLoading(false)
       }
-    }
+  }, [])
 
+  useEffect(() => {
     // Initial laden
     fetchData()
 
@@ -163,7 +166,7 @@ function App() {
 
     // Cleanup
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
   // Durchschnittswerte aus API oder berechnet
   const avgTemperatur = averages?.temperatur_avg?.toFixed(1) || 
@@ -205,7 +208,7 @@ function App() {
               {/* Status Indikator & Refresh Button */}
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => window.location.reload()}
+                  onClick={() => fetchData()}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
                   title="Daten neu laden"
                 >
@@ -325,6 +328,34 @@ function App() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* API-Key für Schreibzugriffe (Heizung/Entfeuchter schalten) */}
+          <ApiKeySettings />
+
+          {/* Heizung & Entfeuchter Steuerung - die Kernfunktion der App, deshalb
+              weit oben statt hinter den Charts und Einstellungs-Panels */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+            <PlugControl
+              plugId="heizung"
+              title="Heizung"
+              direction="below"
+              unit="°C"
+              min={5}
+              max={30}
+              step={0.5}
+              icon="🔥"
+            />
+            <PlugControl
+              plugId="entfeuchter"
+              title="Luftentfeuchter"
+              direction="above"
+              unit="%"
+              min={0}
+              max={100}
+              step={1}
+              icon="💧"
+            />
           </div>
 
           {/* Temperatur & Feuchtigkeit Chart */}
@@ -485,38 +516,9 @@ function App() {
             </ResponsiveContainer>
           </div>
 
-          {/* API-Key für Schreibzugriffe (Heizung/Entfeuchter schalten) */}
-          <ApiKeySettings />
-
-          {/* Testwoche: automatisierte Experiment-Sequenz für die Verbrauchsanalyse */}
+          {/* Erweiterte Einstellungen: seltener gebraucht, deshalb unten */}
           <ExperimentControl />
-
-          {/* WLAN-Fernkonfiguration für den ESP32 */}
           <DeviceWifiConfig />
-
-          {/* Heizung & Entfeuchter Steuerung */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-            <PlugControl
-              plugId="heizung"
-              title="Heizung"
-              direction="below"
-              unit="°C"
-              min={5}
-              max={30}
-              step={0.5}
-              icon="🔥"
-            />
-            <PlugControl
-              plugId="entfeuchter"
-              title="Luftentfeuchter"
-              direction="above"
-              unit="%"
-              min={0}
-              max={100}
-              step={1}
-              icon="💧"
-            />
-          </div>
 
           {/* Verbrauchsvergleich der Kombinationen */}
           <div className="mb-8">
@@ -527,6 +529,9 @@ function App() {
           <div className="mb-8">
             <DayComparison />
           </div>
+
+          {/* Langzeit-Verlauf (übersteht die 30-Tage-Löschung der Rohdaten) */}
+          <LongTermHistory />
 
           {/* Temperatur-Zyklen */}
           <div className="mb-8">

@@ -218,6 +218,26 @@ export const sensorAPI = {
   },
 
   /**
+   * Tages-Durchschnitte für den Langzeitverlauf abrufen (über die 30-Tage-
+   * Aufbewahrung der Rohdaten hinaus, siehe backend/dataRetentionService.js)
+   * @param {number} days - Zeitraum in Tagen (default: 90)
+   * @returns {Promise<Array>} Array mit Tages-Durchschnitten
+   */
+  async getDailySummaries(days = 90) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/sensors/daily-summary?days=${days}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Tages-Durchschnitte:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Statistiken abrufen
    * @returns {Promise<Object>} Statistiken über alle Daten
    */

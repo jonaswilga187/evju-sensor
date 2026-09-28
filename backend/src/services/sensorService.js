@@ -1,4 +1,5 @@
 import SensorMesswert from '../models/SensorMesswert.js';
+import DailySummary from '../models/DailySummary.js';
 
 // Aktuellsten Messwert abrufen
 export const getLatestData = async () => {
@@ -31,6 +32,12 @@ export const getDataByRange = async (startDate, endDate) => {
   .select('zeitstempel temperatur luftfeuchtigkeit stromverbrauch stromverbrauch_heizung stromverbrauch_entfeuchter -_id')
   .sort({ zeitstempel: 1 })
   .lean();
+};
+
+// Tages-Durchschnittswerte der letzten N Tage (Langzeitverlauf über die
+// Rohdaten-Aufbewahrung von 30 Tagen hinaus, siehe dataRetentionService.js)
+export const getDailySummaries = async (days = 90) => {
+  return await DailySummary.getRecent(days);
 };
 
 // Neuen Messwert erstellen

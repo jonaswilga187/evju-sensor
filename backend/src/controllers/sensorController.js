@@ -56,6 +56,19 @@ export const get24HourAverages = async (req, res, next) => {
   }
 };
 
+// GET /api/sensors/daily-summary - Tages-Durchschnitte (Langzeitverlauf,
+// siehe dataRetentionService.js) - Rohdaten selbst gibt's nur 30 Tage
+export const getDailySummaries = async (req, res, next) => {
+  try {
+    const days = parseInt(req.query.days) || 90;
+    const data = await sensorService.getDailySummaries(days);
+
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET /api/sensors/hourly - Stündlich gruppierte Daten
 export const getHourlyData = async (req, res, next) => {
   try {
