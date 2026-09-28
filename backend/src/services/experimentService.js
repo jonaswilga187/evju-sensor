@@ -1,5 +1,45 @@
 import ExperimentPlan from '../models/ExperimentPlan.js';
 import * as plugService from './plugService.js';
+import { getLatestData } from './sensorService.js';
+
+// Harte Sicherheitsgrenze, die ÜBER dem Phasenplan steht: der Plan selbst ist
+// rein zeitbasiert und weiß nichts von der tatsächlichen Temperatur. Ohne
+// diese Grenze würde eine "Heizung an"-Phase stur bis zum Ende durchlaufen,
+// egal wie warm es im Raum mit der Veranstaltungstechnik wird.
+const MAX_TEMP_C = parseFloat(process.env.EXPERIMENT_MAX_TEMP) || 26;
+// Sind die Sensordaten älter als das (z.B. ESP32 offline), gilt der Zustand
+// als nicht vertrauenswürdig -> Heizung bleibt sicherheitshalber aus.
+const MAX_SENSOR_AGE_MS = 5 * 60 * 1000;
+
+// Prüft, ob gerade geheizt werden darf. Fail-safe: fehlende/zu alte
+// Sensordaten zählen als "nicht sicher", nicht als "passt schon".
+const isTemperatureSafe = async () => {
+  let latest;
+  try {
+    latest = await getLatestData();
+  } catch (err) {
+    console.error('🧪⚠️  Sicherheitscheck: Sensordaten konnten nicht gelesen werden:', err.message);
+    latest = null;
+  }
+
+  if (!latest) {
+    console.warn('🧪⚠️  Sicherheitscheck: noch keine Sensordaten vorhanden - Heizung bleibt aus.');
+    return false;
+  }
+
+  const ageMs = Date.now() - new Date(latest.zeitstempel).getTime();
+  if (ageMs > MAX_SENSOR_AGE_MS) {
+    console.warn(`🧪⚠️  Sicherheitscheck: letzte Sensordaten sind ${Math.round(ageMs / 60000)} Min. alt (ESP32 offline?) - Heizung bleibt aus.`);
+    return false;
+  }
+
+  if (latest.temperatur >= MAX_TEMP_C) {
+    console.warn(`🧪🔥 Sicherheitsabschaltung: ${latest.temperatur}°C erreicht/überschreitet das Limit (${MAX_TEMP_C}°C) - Heizung wird zwangsweise ausgeschaltet.`);
+    return false;
+  }
+
+  return true;
+};
 
 // Standard-Testplan für die erste Woche: bewusst viele unterschiedliche
 // Kombinationen und Laufzeiten, damit die Verbrauchsanalyse
@@ -28,7 +68,8 @@ export const DEFAULT_PHASES = [
 ];
 
 const applyPhase = async (phase) => {
-  await plugService.setDesiredState('heizung', phase.heizung, 'experiment');
+  const heizungState = phase.heizung === 'on' && !(await isTemperatureSafe()) ? 'off' : phase.heizung;
+  await plugService.setDesiredState('heizung', heizungState, 'experiment');
   await plugService.setDesiredState('entfeuchter', phase.entfeuchter, 'experiment');
 };
 
@@ -71,6 +112,14 @@ export const advanceIfNeeded = async () => {
   if (!plan.active || plan.phases.length === 0) return;
 
   const currentPhase = plan.phases[plan.current_phase_index];
+
+  // Laufende Sicherheitsprüfung bei JEDEM Aufruf (alle 15s), nicht nur bei
+  // Phasenwechseln - eine zu warme "Heizung an"-Phase wird so sofort
+  // unterbrochen statt erst nach Ablauf ihrer vollen Dauer.
+  if (currentPhase.heizung === 'on') {
+    const safe = await isTemperatureSafe();
+    await plugService.setDesiredState('heizung', safe ? 'on' : 'off', 'experiment');
+  }
   const elapsedMs = Date.now() - new Date(plan.phase_started_at).getTime();
   const elapsedMinutes = elapsedMs / (1000 * 60);
 

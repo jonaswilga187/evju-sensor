@@ -46,6 +46,10 @@ services:
       TARGET_TEMP_MAX: '${TARGET_TEMP_MAX:-22}'
       TARGET_HUMIDITY_MIN: '${TARGET_HUMIDITY_MIN:-40}'
       TARGET_HUMIDITY_MAX: '${TARGET_HUMIDITY_MAX:-60}'
+      # Harte Sicherheitsgrenze für die Testwoche (Experiment-Modus): Heizung
+      # wird zwangsweise ausgeschaltet, sobald diese Temperatur erreicht ist -
+      # unabhängig vom aktuellen Phasenplan.
+      EXPERIMENT_MAX_TEMP: '${EXPERIMENT_MAX_TEMP:-26}'
     depends_on:
       mongodb:
         condition: service_healthy

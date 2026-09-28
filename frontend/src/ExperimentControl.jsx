@@ -82,6 +82,8 @@ function ExperimentControl() {
           <p className="text-sm text-gray-600 mt-1">
             Schaltet Heizung/Entfeuchter automatisch durch verschiedene Kombinationen,
             um gezielt Vergleichsdaten für die Verbrauchsanalyse zu sammeln.
+            Sicherheitsgrenze: Die Heizung wird unabhängig vom Phasenplan zwangsweise
+            ausgeschaltet, sobald 26&nbsp;°C erreicht sind (oder keine aktuellen Sensordaten vorliegen).
           </p>
         </div>
 
