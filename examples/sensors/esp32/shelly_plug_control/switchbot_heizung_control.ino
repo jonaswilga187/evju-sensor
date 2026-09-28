@@ -676,7 +676,12 @@ String getDesiredStateFromAPI(const String &plugId) {
     DeserializationError error = deserializeJson(doc, payload);
 
     if (!error) {
-      result = (doc["data"]["desired_state"] | "unknown").as<String>();
+      // .as<String>() auf das Ergebnis von "|" anzuwenden funktioniert nur in
+      // ArduinoJson v6; in v7 liefert "|" bei Strings direkt ein const char*
+      // zurück (kein Objekt mit .as<>() mehr) - daher hier stattdessen über
+      // isNull() prüfen, das ist in beiden Versionen identisch.
+      JsonVariant desiredVariant = doc["data"]["desired_state"];
+      result = desiredVariant.isNull() ? "unknown" : desiredVariant.as<String>();
     } else {
       Serial.printf("❌ JSON Parse Fehler [%s]: %s\n", plugId.c_str(), error.c_str());
     }
