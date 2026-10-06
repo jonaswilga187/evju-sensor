@@ -12,13 +12,16 @@ const TARGET_HUMIDITY_MAX = parseFloat(process.env.TARGET_HUMIDITY_MAX) || 60;
 
 const PLUG_IDS = ['heizung', 'entfeuchter'];
 
-const isInTargetRange = (reading) => {
+// Exportiert, damit experimentService.js exakt dieselbe Definition von
+// "im Zielbereich" für die sensorgesteuerten Experiment-Phasen verwendet -
+// zwei leicht unterschiedliche Kopien dieser Prüfung wären eine Fehlerquelle.
+export const isInTargetRange = (reading) => {
   const tempOk = reading.temperatur >= TARGET_TEMP_MIN && reading.temperatur <= TARGET_TEMP_MAX;
   const humidityOk = reading.luftfeuchtigkeit >= TARGET_HUMIDITY_MIN && reading.luftfeuchtigkeit <= TARGET_HUMIDITY_MAX;
   return tempOk && humidityOk;
 };
 
-const combinationKey = (states) => PLUG_IDS.map((id) => `${id}:${states[id]}`).join(', ');
+export const combinationKey = (states) => PLUG_IDS.map((id) => `${id}:${states[id]}`).join(', ');
 
 /**
  * Rekonstruiert für einen Zeitraum, welche Plug-Kombination (Heizung/Entfeuchter

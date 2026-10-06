@@ -35,3 +35,15 @@ export const stop = async (req, res, next) => {
     next(error);
   }
 };
+
+// GET /api/experiment/results - protokollierte "reach_target"-Phasen
+// (Dauer bis Zielbereich erreicht + Energieverbrauch pro Kombination)
+export const getResults = async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const data = await experimentService.getResults(limit);
+    res.status(200).json({ success: true, count: data.length, data });
+  } catch (error) {
+    next(error);
+  }
+};

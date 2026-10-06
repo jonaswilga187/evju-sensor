@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { experimentAPI } from './services/api'
 
 // Steuerung für die "Testwoche": startet/stoppt eine automatisch
-// durchlaufende Sequenz aus Heizung/Entfeuchter-Kombinationen mit
-// unterschiedlichen Laufzeiten, um gezielt Vergleichsdaten für die
-// Verbrauchsanalyse zu erzeugen, statt nur auf die normale Automatik zu warten.
+// durchlaufende Sequenz aus Heizung/Entfeuchter-Kombinationen. Jede
+// "reach_target"-Phase läuft, bis der Komfort-Zielbereich (siehe .env:
+// TARGET_TEMP_MIN/MAX, TARGET_HUMIDITY_MIN/MAX) tatsächlich erreicht ist
+// (oder ein Sicherheits-Timeout greift) - das misst direkt, wie effizient
+// jede Kombination ans Ziel kommt, statt nur feste Minuten abzuwarten.
 function ExperimentControl() {
   const [status, setStatus] = useState(null)
+  const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -14,8 +17,12 @@ function ExperimentControl() {
   const fetchStatus = async () => {
     try {
       setError(null)
-      const data = await experimentAPI.getStatus()
-      setStatus(data)
+      const [statusData, resultsData] = await Promise.all([
+        experimentAPI.getStatus(),
+        experimentAPI.getResults(10),
+      ])
+      setStatus(statusData)
+      setResults(resultsData)
     } catch (err) {
       console.error('Fehler beim Laden des Experiment-Status:', err)
       setError('Status konnte nicht geladen werden')
@@ -57,9 +64,9 @@ function ExperimentControl() {
     }
   }
 
-  const formatRemaining = (seconds) => {
+  const formatDuration = (seconds) => {
     const m = Math.floor(seconds / 60)
-    const s = seconds % 60
+    const s = Math.round(seconds % 60)
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
@@ -80,8 +87,8 @@ function ExperimentControl() {
             Testwoche (Experiment-Modus)
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Schaltet Heizung/Entfeuchter automatisch durch verschiedene Kombinationen,
-            um gezielt Vergleichsdaten für die Verbrauchsanalyse zu sammeln.
+            Testet jede Heizung/Entfeuchter-Kombination, bis der Komfort-Zielbereich
+            tatsächlich erreicht ist, und misst dabei Dauer + Energieverbrauch.
             Sicherheitsgrenze: Die Heizung wird unabhängig vom Phasenplan zwangsweise
             ausgeschaltet, sobald 26&nbsp;°C erreicht sind (oder keine aktuellen Sensordaten vorliegen).
           </p>
@@ -120,24 +127,67 @@ function ExperimentControl() {
               {status.loop_count > 0 && ` · Durchlauf ${status.loop_count + 1}`}
             </span>
             <span className="text-sm font-mono font-semibold text-teal-700">
-              noch {formatRemaining(status.remaining_seconds)}
+              läuft seit {formatDuration(status.elapsed_seconds)} (max. {formatDuration(status.max_duration_seconds)})
             </span>
           </div>
           <p className="text-base font-medium text-gray-800">
             {status.current_phase.label}
           </p>
-          <div className="flex gap-4 mt-2 text-sm text-gray-600">
+          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
             <span>🔥 Heizung: <strong>{status.current_phase.heizung === 'on' ? 'AN' : 'AUS'}</strong></span>
             <span>💧 Entfeuchter: <strong>{status.current_phase.entfeuchter === 'on' ? 'AN' : 'AUS'}</strong></span>
+            {status.latest_reading && (
+              <span>
+                📊 Aktuell: {status.latest_reading.temperatur}°C / {status.latest_reading.luftfeuchtigkeit}%
+              </span>
+            )}
+            {status.current_phase.mode !== 'fixed' && (
+              <span className={status.in_target_range ? 'text-green-700 font-semibold' : 'text-gray-500'}>
+                {status.in_target_range ? '✅ Im Zielbereich' : '⏳ Noch außerhalb'}
+              </span>
+            )}
           </div>
         </div>
       )}
 
       {!status?.active && (
         <p className="mt-3 text-xs text-gray-500">
-          Läuft in einer Endlosschleife (17 Phasen, ca. 100 Min. pro Durchlauf), bis du sie stoppst.
-          Danach übernehmen Heizung und Entfeuchter wieder ihre eigenen Modus-Einstellungen (manuell/auto).
+          Läuft in einer Endlosschleife, bis du sie stoppst. Jede Phase endet, sobald
+          ihr Ziel erreicht ist (nicht nach einer festen Zeit). Danach übernehmen Heizung
+          und Entfeuchter wieder ihre eigenen Modus-Einstellungen (manuell/auto).
         </p>
+      )}
+
+      {results.length > 0 && (
+        <div className="mt-4 bg-white/70 rounded-lg p-4 overflow-x-auto">
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            Letzte Ergebnisse: Zeit bis Zielbereich erreicht
+          </p>
+          <table className="w-full text-xs text-left">
+            <thead>
+              <tr className="text-gray-500 border-b border-gray-200">
+                <th className="py-1 pr-3">Kombination</th>
+                <th className="py-1 pr-3">Dauer</th>
+                <th className="py-1 pr-3">Ziel erreicht</th>
+                <th className="py-1 pr-3">Energie</th>
+                <th className="py-1">Temp. Start → Ende</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r) => (
+                <tr key={r._id} className="border-b border-gray-100 last:border-0">
+                  <td className="py-1 pr-3">{r.label}</td>
+                  <td className="py-1 pr-3 font-mono">{formatDuration(r.duration_seconds)}</td>
+                  <td className="py-1 pr-3">{r.reached_target ? '✅' : '⏱️ Timeout'}</td>
+                  <td className="py-1 pr-3">{r.energie_kwh != null ? `${r.energie_kwh} kWh` : '–'}</td>
+                  <td className="py-1">
+                    {r.start_temperatur != null ? `${r.start_temperatur}°C` : '–'} → {r.end_temperatur != null ? `${r.end_temperatur}°C` : '–'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

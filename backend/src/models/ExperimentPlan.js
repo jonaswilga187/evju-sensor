@@ -11,7 +11,17 @@ const phaseSchema = new mongoose.Schema({
   label: { type: String, required: true },
   heizung: { type: String, enum: ['on', 'off'], required: true },
   entfeuchter: { type: String, enum: ['on', 'off'], required: true },
-  duration_minutes: { type: Number, required: true, min: 1 }
+  // 'reach_target': läuft, bis der Komfort-Zielbereich erreicht ist (misst dabei
+  //   automatisch Dauer + Energieverbrauch bis dahin, siehe ExperimentPhaseResult).
+  // 'recover': läuft, bis der Raum wieder klar AUSSERHALB des Zielbereichs ist,
+  //   damit die nächste Phase von einem vergleichbaren Startpunkt losgeht.
+  // 'fixed': alte feste Laufzeit (Abwärtskompatibilität/Spezialfälle) - endet
+  //   einfach nach max_duration_minutes, unabhängig von Sensorwerten.
+  mode: { type: String, enum: ['reach_target', 'recover', 'fixed'], default: 'fixed' },
+  // Sicherheits-/Fallback-Obergrenze: greift immer, egal ob Zielbereich bzw.
+  // "außerhalb"-Zustand erreicht wurde - verhindert eine endlos laufende Phase,
+  // falls das Ziel mit dieser Kombination gar nicht erreichbar ist.
+  max_duration_minutes: { type: Number, required: true, min: 1 }
 }, { _id: false });
 
 const experimentPlanSchema = new mongoose.Schema({

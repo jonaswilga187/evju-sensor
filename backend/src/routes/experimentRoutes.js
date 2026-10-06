@@ -5,6 +5,7 @@ import { requireApiKey } from '../middleware/apiKeyAuth.js';
 const router = express.Router();
 
 router.get('/status', experimentController.getStatus);
+router.get('/results', experimentController.getResults);
 router.post('/start', requireApiKey, experimentController.start);
 router.post('/stop', requireApiKey, experimentController.stop);
 

@@ -577,6 +577,24 @@ export const experimentAPI = {
       throw error;
     }
   },
+
+  /**
+   * Protokollierte "reach_target"-Phasen abrufen (Dauer bis Zielbereich
+   * erreicht + Energieverbrauch pro Kombination), neueste zuerst.
+   */
+  async getResults(limit = 20) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/experiment/results?limit=${limit}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const { data } = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Experiment-Ergebnisse:', error);
+      throw error;
+    }
+  },
 };
 
 /**
