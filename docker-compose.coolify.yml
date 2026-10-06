@@ -50,6 +50,12 @@ services:
       # wird zwangsweise ausgeschaltet, sobald diese Temperatur erreicht ist -
       # unabhängig vom aktuellen Phasenplan.
       EXPERIMENT_MAX_TEMP: '${EXPERIMENT_MAX_TEMP:-26}'
+      # Login fürs Dashboard (ersetzt den früheren nginx Basic-Auth-Dialog,
+      # siehe backend/src/routes/authRoutes.js + frontend/src/LoginPage.jsx)
+      DASHBOARD_USERNAME: '${DASHBOARD_USERNAME}'
+      DASHBOARD_PASSWORD: '${DASHBOARD_PASSWORD}'
+      # Signiert die Session-Cookies - mit z.B. `openssl rand -hex 32` erzeugen
+      SESSION_SECRET: '${SESSION_SECRET}'
     depends_on:
       mongodb:
         condition: service_healthy
@@ -67,10 +73,6 @@ services:
       args:
         VITE_API_URL: 'https://sensor-api.wilga.tech/api'
     restart: unless-stopped
-    environment:
-      # Basic-Auth vor dem Dashboard (siehe frontend/docker-entrypoint.sh)
-      DASHBOARD_USERNAME: '${DASHBOARD_USERNAME}'
-      DASHBOARD_PASSWORD: '${DASHBOARD_PASSWORD}'
     depends_on:
       - backend
 

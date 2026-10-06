@@ -48,6 +48,16 @@ services:
       EMAIL_TO: ${EMAIL_TO:-}
       VERBRAUCH_SCHWELLENWERT: ${VERBRAUCH_SCHWELLENWERT:-12}
       VERBRAUCH_CHECK_INTERVAL_MINUTES: ${VERBRAUCH_CHECK_INTERVAL_MINUTES:-60}
+      # Ziel-Komfortbereich für die Verbrauchsanalyse/Testwoche (nicht die Schaltschwellen!)
+      TARGET_TEMP_MIN: ${TARGET_TEMP_MIN:-18}
+      TARGET_TEMP_MAX: ${TARGET_TEMP_MAX:-22}
+      TARGET_HUMIDITY_MIN: ${TARGET_HUMIDITY_MIN:-40}
+      TARGET_HUMIDITY_MAX: ${TARGET_HUMIDITY_MAX:-60}
+      EXPERIMENT_MAX_TEMP: ${EXPERIMENT_MAX_TEMP:-26}
+      # Login fürs Dashboard (siehe backend/src/routes/authRoutes.js + frontend/src/LoginPage.jsx)
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET}
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     depends_on:

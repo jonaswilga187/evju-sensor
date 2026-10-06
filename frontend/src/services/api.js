@@ -17,13 +17,24 @@ export const getApiKey = () => localStorage.getItem(API_KEY_STORAGE_KEY) || '';
 export const setApiKey = (key) => localStorage.setItem(API_KEY_STORAGE_KEY, key);
 
 /**
- * Führt einen fetch-Request mit API-Key-Header aus. Schlägt der Request mit
- * 401 fehl (fehlender/falscher Key), wird der Nutzer einmalig zur Eingabe
- * aufgefordert und der Request wiederholt.
+ * fetch-Wrapper, der bei jedem Request das Session-Cookie mitschickt
+ * (credentials: 'include'). Ohne das würde der Browser das Login-Cookie bei
+ * Cross-Origin-Requests (Frontend- und Backend-Domain unterscheiden sich)
+ * nicht automatisch senden, und jeder Request landete bei requireSession.
+ */
+async function apiFetch(url, options = {}) {
+  return fetch(url, { ...options, credentials: 'include' });
+}
+
+/**
+ * Führt einen Request mit API-Key-Header aus (zusätzlich zur Session - der
+ * API-Key schützt gezielt die Heizungssteuerung, die Session das Dashboard
+ * insgesamt). Schlägt der Request mit 401 fehl (fehlender/falscher Key),
+ * wird der Nutzer einmalig zur Eingabe aufgefordert und der Request wiederholt.
  */
 async function authorizedFetch(url, options = {}) {
   const doFetch = () =>
-    fetch(url, {
+    apiFetch(url, {
       ...options,
       headers: {
         ...options.headers,
@@ -55,7 +66,7 @@ export const sensorAPI = {
    */
   async get24HourData() {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/24h`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/24h`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -73,7 +84,7 @@ export const sensorAPI = {
    */
   async getAverages() {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/averages`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/averages`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -91,7 +102,7 @@ export const sensorAPI = {
    */
   async getLatest() {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/latest`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/latest`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -110,7 +121,7 @@ export const sensorAPI = {
    */
   async getHourlyData(hours = 24) {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/hourly?hours=${hours}`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/hourly?hours=${hours}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -132,7 +143,7 @@ export const sensorAPI = {
     try {
       const start = startDate.toISOString();
       const end = endDate.toISOString();
-      const response = await fetch(`${API_BASE_URL}/sensors/range?start=${start}&end=${end}`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/range?start=${start}&end=${end}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -151,7 +162,7 @@ export const sensorAPI = {
    */
   async getDataByDate(date) {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/day?date=${date}`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/day?date=${date}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -174,7 +185,7 @@ export const sensorAPI = {
    */
   async createMesswert(messwert) {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors`, {
+      const response = await apiFetch(`${API_BASE_URL}/sensors`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -199,7 +210,7 @@ export const sensorAPI = {
    */
   async createBulkMesswerte(messwerte) {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/bulk`, {
+      const response = await apiFetch(`${API_BASE_URL}/sensors/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,7 +236,7 @@ export const sensorAPI = {
    */
   async getDailySummaries(days = 90) {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/daily-summary?days=${days}`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/daily-summary?days=${days}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -243,7 +254,7 @@ export const sensorAPI = {
    */
   async getStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/sensors/stats`);
+      const response = await apiFetch(`${API_BASE_URL}/sensors/stats`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -268,7 +279,7 @@ export const plugAPI = {
    */
   async getAll() {
     try {
-      const response = await fetch(`${API_BASE_URL}/plug`);
+      const response = await apiFetch(`${API_BASE_URL}/plug`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -287,7 +298,7 @@ export const plugAPI = {
    */
   async getStatus(plugId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/plug/${plugId}/status`);
+      const response = await apiFetch(`${API_BASE_URL}/plug/${plugId}/status`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -374,7 +385,7 @@ export const analysisAPI = {
    */
   async getConsumptionComparison(days = 30) {
     try {
-      const response = await fetch(`${API_BASE_URL}/analysis/consumption?days=${days}`);
+      const response = await apiFetch(`${API_BASE_URL}/analysis/consumption?days=${days}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -401,7 +412,7 @@ export const weatherAPI = {
   async get24HourTemperature(latitude = 52.62, longitude = 10.08) {
     try {
       const url = `${API_BASE_URL}/weather/24h?latitude=${latitude}&longitude=${longitude}`;
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -433,7 +444,7 @@ export const systemAPI = {
    */
   async getHealth() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const response = await apiFetch(`${API_BASE_URL}/health`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -467,7 +478,7 @@ export const temperatureCycleAPI = {
         url += `&cycleType=${cycleType}`;
       }
       
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -490,7 +501,7 @@ export const temperatureCycleAPI = {
       const start = startDate instanceof Date ? startDate.toISOString().split('T')[0] : startDate;
       const end = endDate instanceof Date ? endDate.toISOString().split('T')[0] : endDate;
       
-      const response = await fetch(`${API_BASE_URL}/cycles/daily?startDate=${start}&endDate=${end}`);
+      const response = await apiFetch(`${API_BASE_URL}/cycles/daily?startDate=${start}&endDate=${end}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -510,7 +521,7 @@ export const temperatureCycleAPI = {
   async getCyclesByDate(date) {
     try {
       const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
-      const response = await fetch(`${API_BASE_URL}/cycles/${dateStr}`);
+      const response = await apiFetch(`${API_BASE_URL}/cycles/${dateStr}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -532,7 +543,7 @@ export const temperatureCycleAPI = {
 export const experimentAPI = {
   async getStatus() {
     try {
-      const response = await fetch(`${API_BASE_URL}/experiment/status`);
+      const response = await apiFetch(`${API_BASE_URL}/experiment/status`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -584,7 +595,7 @@ export const experimentAPI = {
    */
   async getResults(limit = 20) {
     try {
-      const response = await fetch(`${API_BASE_URL}/experiment/results?limit=${limit}`);
+      const response = await apiFetch(`${API_BASE_URL}/experiment/results?limit=${limit}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -607,7 +618,7 @@ export const experimentAPI = {
 export const deviceAPI = {
   async getConfigStatus(deviceId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/device/${deviceId}/config/status`);
+      const response = await apiFetch(`${API_BASE_URL}/device/${deviceId}/config/status`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -634,6 +645,52 @@ export const deviceAPI = {
     } catch (error) {
       console.error(`Fehler beim Setzen der WLAN-Config (${deviceId}):`, error);
       throw error;
+    }
+  },
+};
+
+/**
+ * Auth API Service
+ * Login/Logout für das Dashboard (ersetzt den bisherigen nginx Basic-Auth-
+ * Dialog durch eine serverseitig geprüfte Session, siehe requireSession.js).
+ * Das Session-Cookie wird vom Browser verwaltet - hier nur die Requests dazu.
+ */
+export const authAPI = {
+  /**
+   * @returns {Promise<boolean>} true, wenn eine gültige Session besteht
+   */
+  async checkSession() {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/auth/me`);
+      return response.ok;
+    } catch (error) {
+      console.error('Fehler beim Prüfen der Session:', error);
+      return false;
+    }
+  },
+
+  /**
+   * @param {string} username
+   * @param {string} password
+   * @returns {Promise<void>} wirft bei falschen Zugangsdaten oder Serverfehler
+   */
+  async login(username, password) {
+    const response = await apiFetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(body.message || 'Login fehlgeschlagen');
+    }
+  },
+
+  async logout() {
+    try {
+      await apiFetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' });
+    } catch (error) {
+      console.error('Fehler beim Logout:', error);
     }
   },
 };

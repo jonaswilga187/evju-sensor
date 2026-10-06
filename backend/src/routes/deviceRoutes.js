@@ -1,6 +1,7 @@
 import express from 'express';
 import * as deviceController from '../controllers/deviceController.js';
 import { requireApiKey } from '../middleware/apiKeyAuth.js';
+import { requireSession } from '../middleware/requireSession.js';
 
 const router = express.Router();
 
@@ -8,7 +9,7 @@ const router = express.Router();
 router.get('/:deviceId/config', requireApiKey, deviceController.getConfig);
 
 // GET /api/device/:deviceId/config/status - Für Website: Version/Bestätigungsstatus (ohne Passwort)
-router.get('/:deviceId/config/status', deviceController.getConfigStatus);
+router.get('/:deviceId/config/status', requireSession, deviceController.getConfigStatus);
 
 // PUT /api/device/:deviceId/config - Für Website: Neue WLAN-Zugangsdaten hinterlegen
 router.put('/:deviceId/config', requireApiKey, deviceController.setConfig);

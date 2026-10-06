@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { AreaChart, Area, LineChart, Line, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { sensorAPI, systemAPI } from './services/api'
+import { sensorAPI, systemAPI, authAPI } from './services/api'
 import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
 import TemperatureCycles from './TemperatureCycles'
@@ -9,6 +9,7 @@ import ConsumptionAnalysis from './ConsumptionAnalysis'
 import ExperimentControl from './ExperimentControl'
 import DeviceWifiConfig from './DeviceWifiConfig'
 import LongTermHistory from './LongTermHistory'
+import LoginPage from './LoginPage'
 
 // Fallback Beispiel-Daten (falls API nicht erreichbar)
 const fallbackData = [
@@ -69,6 +70,14 @@ const CustomTooltip = ({ active, payload }) => {
 }
 
 function App() {
+  // Login-Status: 'checking' (Session wird geprüft) | 'in' | 'out'. Ersetzt
+  // den bisherigen nginx Basic-Auth-Dialog durch eine richtige Login-Seite.
+  const [authState, setAuthState] = useState('checking')
+
+  useEffect(() => {
+    authAPI.checkSession().then((ok) => setAuthState(ok ? 'in' : 'out'))
+  }, [])
+
   // State für Daten
   const [data, setData] = useState(fallbackData)
   const [averages, setAverages] = useState(null)
@@ -158,6 +167,10 @@ function App() {
   }, [])
 
   useEffect(() => {
+    // Erst laden, sobald eine gültige Session besteht - vorher würde jeder
+    // Request mit 401 scheitern (siehe requireSession.js im Backend).
+    if (authState !== 'in') return
+
     // Initial laden
     fetchData()
 
@@ -166,7 +179,7 @@ function App() {
 
     // Cleanup
     return () => clearInterval(interval)
-  }, [fetchData])
+  }, [authState, fetchData])
 
   // Durchschnittswerte aus API oder berechnet
   const avgTemperatur = averages?.temperatur_avg?.toFixed(1) || 
@@ -177,6 +190,20 @@ function App() {
   
   const kwhPer24h = averages?.kwh_24h?.toFixed(2) || 
     ((data.reduce((sum, item) => sum + item.stromverbrauch, 0) / data.length * 24) / 1000).toFixed(2)
+
+  // Session wird noch geprüft
+  if (authState === 'checking') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  // Nicht eingeloggt -> Login-Seite statt Dashboard
+  if (authState === 'out') {
+    return <LoginPage onSuccess={() => setAuthState('in')} />
+  }
 
   // Loading State
   if (loading && data.length === 0) {
@@ -223,6 +250,13 @@ function App() {
                     {error ? 'Offline' : 'Live (30s)'}
                   </span>
                 </div>
+                <button
+                  onClick={() => authAPI.logout().then(() => setAuthState('out'))}
+                  className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  title="Abmelden"
+                >
+                  Abmelden
+                </button>
               </div>
             </div>
             {error && (
