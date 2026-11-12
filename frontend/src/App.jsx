@@ -5,8 +5,6 @@ import PlugControl from './PlugControl'
 import DayComparison from './DayComparison'
 import TemperatureCycles from './TemperatureCycles'
 import ApiKeySettings from './ApiKeySettings'
-import ConsumptionAnalysis from './ConsumptionAnalysis'
-import ExperimentControl from './ExperimentControl'
 import DeviceWifiConfig from './DeviceWifiConfig'
 import LongTermHistory from './LongTermHistory'
 import LoginPage from './LoginPage'
@@ -550,13 +548,7 @@ function App() {
           </div>
 
           {/* Erweiterte Einstellungen: seltener gebraucht, deshalb unten */}
-          <ExperimentControl />
           <DeviceWifiConfig />
-
-          {/* Verbrauchsvergleich der Kombinationen */}
-          <div className="mb-8">
-            <ConsumptionAnalysis />
-          </div>
 
           {/* Tagesvergleich */}
           <div className="mb-8">

@@ -8,8 +8,6 @@ function TemperatureCycles() {
   const [error, setError] = useState(null)
   const [filterType, setFilterType] = useState('all') // 'all', 'heating', 'cooling'
   const [daysRange, setDaysRange] = useState(30) // 7, 14, 30
-  const [sortBy, setSortBy] = useState('date') // 'date', 'duration'
-  const [sortOrder, setSortOrder] = useState('desc') // 'asc', 'desc'
 
   // Daten laden
   useEffect(() => {
@@ -41,31 +39,7 @@ function TemperatureCycles() {
     fetchData()
   }, [filterType, daysRange])
 
-  // Sortierung
-  const sortedCycles = [...cycles].sort((a, b) => {
-    let comparison = 0
-    
-    if (sortBy === 'date') {
-      comparison = new Date(a.start_time) - new Date(b.start_time)
-    } else if (sortBy === 'duration') {
-      comparison = a.duration_minutes - b.duration_minutes
-    }
-    
-    return sortOrder === 'asc' ? comparison : -comparison
-  })
-
   // Formatierung
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   const formatDuration = (minutes) => {
     if (minutes < 60) {
       return `${minutes} Min`
@@ -73,14 +47,6 @@ function TemperatureCycles() {
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
     return mins > 0 ? `${hours}h ${mins}Min` : `${hours}h`
-  }
-
-  const getCycleTypeLabel = (type) => {
-    return type === 'heating' ? 'Heizen' : 'Abkühlen'
-  }
-
-  const getCycleTypeColor = (type) => {
-    return type === 'heating' ? 'text-orange-600' : 'text-blue-600'
   }
 
   // Statistiken berechnen
@@ -111,7 +77,7 @@ function TemperatureCycles() {
 
       {/* Filter-Box */}
       <div className="bg-white rounded-lg p-4 mb-6 border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           {/* Zeitraum */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -144,28 +110,6 @@ function TemperatureCycles() {
             </select>
           </div>
 
-          {/* Sortierung */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sortierung
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="date">Datum</option>
-                <option value="duration">Dauer</option>
-              </select>
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                {sortOrder === 'asc' ? '↑' : '↓'}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -284,75 +228,6 @@ function TemperatureCycles() {
               </div>
             </div>
           )}
-
-          {/* Zyklen-Tabelle */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Alle Zyklen ({sortedCycles.length})
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Datum/Zeit
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Typ
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Start-Temp
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      End-Temp
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dauer
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Schwellenwert
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Modus
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedCycles.map((cycle, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(cycle.start_time)}
-                      </td>
-                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-center font-medium ${getCycleTypeColor(cycle.cycle_type)}`}>
-                        {getCycleTypeLabel(cycle.cycle_type)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600">
-                        {cycle.start_temperature.toFixed(1)}°C
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600">
-                        {cycle.end_temperature.toFixed(1)}°C
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600 font-medium">
-                        {formatDuration(cycle.duration_minutes)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600">
-                        {cycle.threshold.toFixed(1)}°C
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-600">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          cycle.mode === 'auto' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {cycle.mode === 'auto' ? 'Auto' : 'Manuell'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </>
       )}
 

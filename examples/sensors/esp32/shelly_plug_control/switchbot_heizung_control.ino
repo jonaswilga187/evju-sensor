@@ -83,6 +83,7 @@ const unsigned long SENSOR_INTERVAL = 60000;     // 1 Minute für Sensordaten
 const unsigned long PLUG_CHECK_INTERVAL = 5000;  // 5 Sekunden für Plug-Status (nur eigene API!)
 const unsigned long CONFIG_CHECK_INTERVAL = 60000;  // 1 Minute für WLAN-Config-Poll
 const unsigned long WIFI_CONNECT_TIMEOUT = 15000;   // 15 Sekunden pro Verbindungsversuch
+const unsigned long DEVICE_RETRY_INTERVAL = 300000; // 5 Minuten: fehlende SwitchBot-Geräte erneut suchen
 
 // ==================== PLUG-STRUKTUR ====================
 
@@ -103,6 +104,7 @@ Plug plugs[2] = {
 unsigned long lastSensorRead = 0;
 unsigned long lastPlugCheck = 0;
 unsigned long lastConfigCheck = 0;
+unsigned long lastDeviceRetry = 0;
 
 // WLAN-Fernkonfiguration: aktuell aktive (zuletzt funktionierende) und ggf.
 // wartende neue Zugangsdaten, persistiert in Preferences (NVS).
@@ -187,6 +189,17 @@ void loop() {
     for (int i = 0; i < 2; i++) {
       checkAndControlPlug(i);
     }
+  }
+
+  // Fehlende SwitchBot-Geräte erneut suchen. Schlägt die Suche beim Start
+  // fehl (WLAN/Zeit noch nicht da, SwitchBot-API kurz weg), blieb die
+  // Geräte-ID bisher bis zum nächsten Neustart leer: kein Schalten mehr und
+  // dauerhaft 0 W Stromverbrauch (so passiert am 09.11.2026).
+  if ((plugs[0].switchbotDeviceId.length() == 0 || plugs[1].switchbotDeviceId.length() == 0) &&
+      currentMillis - lastDeviceRetry >= DEVICE_RETRY_INTERVAL) {
+    lastDeviceRetry = currentMillis;
+    Serial.println("🔍 SwitchBot-Gerät fehlt - suche erneut...");
+    resolveSwitchBotDeviceIds();
   }
 
   // 3. WLAN-Fernkonfiguration prüfen (alle 60 Sekunden)
@@ -541,8 +554,15 @@ void resolveSwitchBotDeviceIds() {
 
   if (httpCode == 200) {
     String payload = http.getString();
-    DynamicJsonDocument doc(4096);
-    DeserializationError error = deserializeJson(doc, payload);
+    // Nur die benötigten Felder parsen: mit vielen Geräten in der
+    // SwitchBot-App wird die Antwort schnell größer als ein fester Puffer,
+    // dann schlug die Suche mit NoMemory fehl.
+    StaticJsonDocument<128> filter;
+    filter["body"]["deviceList"][0]["deviceId"] = true;
+    filter["body"]["deviceList"][0]["deviceName"] = true;
+    filter["body"]["deviceList"][0]["deviceType"] = true;
+    DynamicJsonDocument doc(16384);
+    DeserializationError error = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
 
     if (!error) {
       JsonArray devices = doc["body"]["deviceList"];
